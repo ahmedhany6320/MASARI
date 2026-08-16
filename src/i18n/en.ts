@@ -327,4 +327,5 @@ export const en: Record<StringKey, string> = {
   pullConfirmT: 'Pull from cloud',
   pullConfirmS: 'This replaces the data on this device with what is stored in the cloud. Are you sure?',
   loading: 'One moment...',
+  notifNeedsBuild: 'Notifications do not run inside Expo Go on Android — that is an Expo restriction, not the app. They work in a development build with no code change.',
 };

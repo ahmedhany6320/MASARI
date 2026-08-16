@@ -325,6 +325,7 @@ export const ar = {
   pullConfirmT: 'تنزيل من السحابة',
   pullConfirmS: 'ده هيمسح بيانات الجهاز ويحط اللي على السحابة مكانها. متأكد؟',
   loading: 'لحظة...',
+  notifNeedsBuild: 'الإشعارات مش شغالة جوه Expo Go على أندرويد — ده قيد من Expo نفسها مش من التطبيق. لما تعمل نسخة تطوير (development build) هتشتغل من غير أي تغيير في الكود.',
 } as const;
 
 export type StringKey = keyof typeof ar;

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
-import { getPermissionState, rescheduleAll } from '../lib/notifications';
+import { canNotify, getPermissionState, rescheduleAll } from '../lib/notifications';
 import { useLedger } from '../store/useLedger';
 
 /**
@@ -26,7 +26,9 @@ export function useNotificationSync(): void {
 
   useEffect(() => {
     // Scheduling before hydration would build the queue from an empty ledger.
-    if (!hydrated) return;
+    // `canNotify` short-circuits Expo Go on Android, where the native module
+    // is absent and every call would be a no-op anyway.
+    if (!hydrated || !canNotify()) return;
 
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -42,6 +44,7 @@ export function useNotificationSync(): void {
   }, [hydrated, ledger, fxRate, lang, reminders]);
 
   useEffect(() => {
+    if (!canNotify()) return;
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active' || !hydrated) return;
       void (async () => {

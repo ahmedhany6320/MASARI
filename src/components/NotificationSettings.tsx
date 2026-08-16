@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Linking, Switch, View } from 'react-native';
 import {
+  canNotify,
   getPermissionState,
   requestPermission,
   rescheduleAll,
@@ -108,7 +109,12 @@ export function NotificationSettings() {
     <Card>
       <Title>{t('notifT')}</Title>
 
-      {perm === 'granted' ? (
+      {!canNotify() ? (
+        // Expo Go on Android strips the notification module. Say so plainly
+        // rather than showing a toggle that cannot work — the app itself is
+        // fine, the container it is running in is the limitation.
+        <Caption>{t('notifNeedsBuild')}</Caption>
+      ) : perm === 'granted' ? (
         <Caption>{t('notifGrantedNative')}</Caption>
       ) : perm === 'denied' ? (
         <>
@@ -130,7 +136,7 @@ export function NotificationSettings() {
         </>
       )}
 
-      {perm === 'granted' && (
+      {canNotify() && perm === 'granted' && (
         <View style={{ marginTop: SPACE.md }}>
           {row(t('notifMorning'), t('notifMorningHint'), reminders.morning, (v) =>
             setReminders({ morning: v }),
