@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QuickAdd } from '../../src/components/QuickAdd';
+import { SeedBanner } from '../../src/components/SeedBanner';
 import { QuickAction } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import { formatShortDate } from '../../src/i18n';
@@ -45,6 +46,8 @@ export default function HomeScreen() {
           { paddingTop: insets.top + SPACE.lg, paddingBottom: SPACE.xxl },
         ]}
       >
+        <SeedBanner />
+
         <Card>
           <Caption>{t('ssl')}</Caption>
           <Text style={[styles.hero, { color: headlineColor, textAlign: rtl ? 'right' : 'left' }]}>

@@ -1,24 +1,33 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Text, View, type ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalization, usePalette } from '../../src/store/selectors';
 import { FONT, SPACE } from '../../src/theme/tokens';
 
+/** Keeps Home the landing tab even though Arabic declares it last. */
+export const unstable_settings = { initialRouteName: 'index' };
+
 /**
- * Bottom tab bar, matching the prototype's five sections.
+ * Bottom tab bar.
  *
- * In Arabic the whole bar is reversed with `row-reverse` so Home sits on the
- * RIGHT, where the reading eye starts. Native RTL mirroring is deliberately
- * switched off app-wide (see `app/_layout.tsx`), so the bar has to be flipped
- * here explicitly — otherwise the first tab lands on the left and the order
- * reads backwards to an Arabic speaker.
+ * Two things here are easy to get wrong and were, at first:
  *
- * Glyphs are plain text rather than an icon font: it keeps the bundle free of
- * a dependency for five symbols, and they render identically both ways round.
+ * 1. ORDER. `tabBarStyle` lands on the bar's outer container, but the buttons
+ *    live in an inner row inside it — so `flexDirection: 'row-reverse'` there
+ *    does nothing. The order comes from the order the screens are DECLARED,
+ *    which is why the list below is reversed for Arabic instead. Home then
+ *    sits on the right, where the reading eye starts.
+ *
+ * 2. HEIGHT. The navigator applies `paddingBottom: insets.bottom` and its own
+ *    height BEFORE spreading `tabBarStyle`, so setting either without adding
+ *    the inset back overrides the safe-area padding — and with edge-to-edge on
+ *    Android the bar slides under the system gesture bar and stops responding
+ *    to taps. Any height set here must include `insets.bottom`.
  */
 function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
   return (
     <View style={styles.icon}>
-      <Text style={{ color, fontSize: 22 }}>{glyph}</Text>
+      <Text style={{ color, fontSize: 24 }}>{glyph}</Text>
     </View>
   );
 }
@@ -26,6 +35,17 @@ function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
 export default function TabsLayout() {
   const p = usePalette();
   const { t, rtl } = useLocalization();
+  const insets = useSafeAreaInsets();
+
+  const screens = [
+    { name: 'index', title: t('navHome'), glyph: '⌂' },
+    { name: 'plan', title: t('navPlan'), glyph: '◈' },
+    { name: 'transactions', title: t('navTx'), glyph: '≡' },
+    { name: 'calendar', title: t('navCal'), glyph: '▦' },
+    { name: 'more', title: t('navMore'), glyph: '⋯' },
+  ];
+
+  const ordered = rtl ? [...screens].reverse() : screens;
 
   return (
     <Tabs
@@ -36,58 +56,27 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: p.surface,
           borderTopColor: p.faint,
-          // Reverses the whole strip in Arabic.
-          flexDirection: rtl ? 'row-reverse' : 'row',
-          // Taller bar so the bigger labels are not cramped against the edge.
-          height: 68,
-          paddingTop: SPACE.sm,
-          paddingBottom: SPACE.sm,
+          // The inset MUST be added back — see the note above.
+          height: 62 + insets.bottom,
+          paddingBottom: insets.bottom,
+          paddingTop: SPACE.xs,
         },
         tabBarLabelStyle: {
-          // Was FONT.micro (11) and genuinely hard to read; this is the
-          // smallest size that stays comfortable at arm's length.
           fontSize: FONT.small,
           fontWeight: '600',
-          marginTop: 2,
         },
-        tabBarItemStyle: { paddingVertical: SPACE.xs },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t('navHome'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="⌂" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="plan"
-        options={{
-          title: t('navPlan'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="◈" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="transactions"
-        options={{
-          title: t('navTx'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="≡" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="calendar"
-        options={{
-          title: t('navCal'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="▦" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: t('navMore'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="⋯" color={color} />,
-        }}
-      />
+      {ordered.map((s) => (
+        <Tabs.Screen
+          key={s.name}
+          name={s.name}
+          options={{
+            title: s.title,
+            tabBarIcon: ({ color }) => <TabIcon glyph={s.glyph} color={color} />,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }

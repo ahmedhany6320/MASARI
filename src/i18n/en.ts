@@ -447,4 +447,5 @@ export const en: Record<StringKey, string> = {
   seedConfirm: 'This loads the backup bundled inside the app — balances, transactions, card, people and goals. It replaces anything currently on this device.',
   pasteBackup: 'Or paste another backup',
   orStartFresh: 'Or start fresh and enter your figures:',
+  seedBannerBody: 'The ledger is empty. Your saved data is bundled inside the app — one tap brings it all back.',
 };
