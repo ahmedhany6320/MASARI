@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { uuid } from '../lib/id';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   DEFAULT_FX_RATE,
@@ -15,6 +16,18 @@ import {
   type TxType,
 } from '../domain';
 
+/** When the scheduled local notifications fire, and which ones. */
+export interface Reminders {
+  /** Daily brief with today's safe spend limit. */
+  morning: boolean;
+  morningHour: number;
+  /** Evening alert, sent only on a day that went over. */
+  evening: boolean;
+  eveningHour: number;
+  /** Heads-up on commitments falling due. */
+  commitments: boolean;
+}
+
 /** Settings live alongside the ledger but are deliberately not part of it. */
 export interface Settings {
   lang: Lang;
@@ -24,6 +37,7 @@ export interface Settings {
   onboarded: boolean;
   /** Require device biometrics on launch. */
   biometricLock: boolean;
+  reminders: Reminders;
 }
 
 export interface LedgerStore {
@@ -36,6 +50,7 @@ export interface LedgerStore {
   setTheme: (theme: Theme) => void;
   setFxRate: (rate: number) => void;
   setBiometricLock: (on: boolean) => void;
+  setReminders: (patch: Partial<Reminders>) => void;
   completeOnboarding: (init: Partial<Ledger>) => void;
 
   addTx: (tx: Omit<Tx, 'id'>) => void;
@@ -74,18 +89,21 @@ const DEFAULT_SETTINGS: Settings = {
   fxRate: DEFAULT_FX_RATE,
   onboarded: false,
   biometricLock: false,
+  reminders: {
+    morning: true,
+    morningHour: 9,
+    evening: true,
+    eveningHour: 21,
+    commitments: true,
+  },
 };
 
 /**
- * Ids are generated on-device. `crypto.randomUUID` is not guaranteed present
- * in every React Native runtime, so this falls back to a timestamp-plus-random
- * string — unique enough for rows that only ever collide within one user's own
- * ledger.
+ * Ids are UUIDs rather than readable prefixed strings, because they are used
+ * verbatim as Postgres primary keys during sync — see `src/lib/id.ts`.
  */
-function newId(prefix: string): string {
-  const g = globalThis as { crypto?: { randomUUID?: () => string } };
-  if (typeof g.crypto?.randomUUID === 'function') return g.crypto.randomUUID();
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+function newId(): string {
+  return uuid();
 }
 
 /**
@@ -103,7 +121,7 @@ function newId(prefix: string): string {
 export const useLedger = create<LedgerStore>()(
   persist(
     (set, get) => ({
-      ledger: emptyLedger(),
+      ledger: emptyLedger(uuid),
       settings: { ...DEFAULT_SETTINGS },
       hydrated: false,
 
@@ -112,6 +130,8 @@ export const useLedger = create<LedgerStore>()(
       setFxRate: (fxRate) =>
         set((s) => ({ settings: { ...s.settings, fxRate: fxRate > 0 ? fxRate : s.settings.fxRate } })),
       setBiometricLock: (biometricLock) => set((s) => ({ settings: { ...s.settings, biometricLock } })),
+      setReminders: (patch) =>
+        set((s) => ({ settings: { ...s.settings, reminders: { ...s.settings.reminders, ...patch } } })),
 
       completeOnboarding: (init) =>
         set((s) => ({
@@ -123,7 +143,7 @@ export const useLedger = create<LedgerStore>()(
         set((s) => ({
           // Newest first: every screen that shows transactions wants that order,
           // and sorting at render time would repeat the work on every frame.
-          ledger: { ...s.ledger, tx: [{ ...tx, id: newId('tx') }, ...s.ledger.tx] },
+          ledger: { ...s.ledger, tx: [{ ...tx, id: newId() }, ...s.ledger.tx] },
         })),
 
       removeTx: (id) =>
@@ -139,7 +159,7 @@ export const useLedger = create<LedgerStore>()(
       setCashOpen: (cashOpen) => set((s) => ({ ledger: { ...s.ledger, cashOpen } })),
 
       addCommitment: (c) =>
-        set((s) => ({ ledger: { ...s.ledger, commits: [...s.ledger.commits, { ...c, id: newId('cm') }] } })),
+        set((s) => ({ ledger: { ...s.ledger, commits: [...s.ledger.commits, { ...c, id: newId() }] } })),
       updateCommitment: (id, patch) =>
         set((s) => ({
           ledger: {
@@ -151,7 +171,7 @@ export const useLedger = create<LedgerStore>()(
         set((s) => ({ ledger: { ...s.ledger, commits: s.ledger.commits.filter((c) => c.id !== id) } })),
 
       addGoal: (g) =>
-        set((s) => ({ ledger: { ...s.ledger, goals: [...s.ledger.goals, { ...g, id: newId('gl') }] } })),
+        set((s) => ({ ledger: { ...s.ledger, goals: [...s.ledger.goals, { ...g, id: newId() }] } })),
       updateGoal: (id, patch) =>
         set((s) => ({
           ledger: { ...s.ledger, goals: s.ledger.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)) },
@@ -160,7 +180,7 @@ export const useLedger = create<LedgerStore>()(
         set((s) => ({ ledger: { ...s.ledger, goals: s.ledger.goals.filter((g) => g.id !== id) } })),
 
       addPerson: (p) =>
-        set((s) => ({ ledger: { ...s.ledger, people: [...s.ledger.people, { ...p, id: newId('pp') }] } })),
+        set((s) => ({ ledger: { ...s.ledger, people: [...s.ledger.people, { ...p, id: newId() }] } })),
       updatePerson: (id, patch) =>
         set((s) => ({
           ledger: { ...s.ledger, people: s.ledger.people.map((p) => (p.id === id ? { ...p, ...patch } : p)) },
@@ -183,7 +203,7 @@ export const useLedger = create<LedgerStore>()(
           ledger: { ...s.ledger, rules: { ...s.ledger.rules, [merchant.trim().toLowerCase()]: catId } },
         })),
 
-      reset: () => set({ ledger: emptyLedger(), settings: { ...DEFAULT_SETTINGS } }),
+      reset: () => set({ ledger: emptyLedger(uuid), settings: { ...DEFAULT_SETTINGS } }),
 
       replaceAll: (ledger, settings) =>
         set((s) => ({ ledger, settings: { ...s.settings, ...settings } })),
@@ -192,6 +212,29 @@ export const useLedger = create<LedgerStore>()(
       name: 'masari.ledger.v1',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({ ledger: s.ledger, settings: s.settings }),
+      /**
+       * Zustand's default merge is shallow, so a ledger saved by an older
+       * build would replace `settings` wholesale and drop any key added since
+       * — leaving, say, `settings.reminders` undefined and crashing on first
+       * read. Filling from the defaults per level keeps old saves loadable as
+       * the shape grows.
+       */
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<LedgerStore>;
+        return {
+          ...current,
+          ...saved,
+          ledger: { ...current.ledger, ...(saved.ledger ?? {}) },
+          settings: {
+            ...current.settings,
+            ...(saved.settings ?? {}),
+            reminders: {
+              ...current.settings.reminders,
+              ...(saved.settings?.reminders ?? {}),
+            },
+          },
+        };
+      },
       // Runs after the persisted state has been read back. Flipping `hydrated`
       // only here lets the UI hold a splash rather than flashing an empty
       // ledger over the user's real data for a frame. Safe to reference

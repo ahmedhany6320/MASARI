@@ -2,14 +2,27 @@ import type { Category, Ledger } from './types';
 
 export const DEFAULT_FX_RATE = 13.6;
 
-export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'c1', ar: 'بقالة', en: 'Groceries' },
-  { id: 'c2', ar: 'مطاعم', en: 'Restaurants' },
-  { id: 'c3', ar: 'مواصلات', en: 'Transport' },
-  { id: 'c4', ar: 'فواتير والتزامات', en: 'Bills & commitments' },
-  { id: 'c5', ar: 'صحة', en: 'Health' },
-  { id: 'c6', ar: 'ترفيه', en: 'Entertainment' },
-  { id: 'c7', ar: 'أخرى', en: 'Other' },
+/**
+ * Fallback id source, used only when no generator is supplied. Deliberately
+ * not a UUID: sync skips non-UUID ids, so a ledger built without the app's
+ * generator degrades to local-only rather than sending Postgres a key it will
+ * reject.
+ */
+let seq = 0;
+function defaultId(): string {
+  seq += 1;
+  return `local-${seq}`;
+}
+
+/** Category names, without ids — the caller supplies those. */
+export const DEFAULT_CATEGORY_NAMES: Omit<Category, 'id'>[] = [
+  { ar: 'بقالة', en: 'Groceries' },
+  { ar: 'مطاعم', en: 'Restaurants' },
+  { ar: 'مواصلات', en: 'Transport' },
+  { ar: 'فواتير والتزامات', en: 'Bills & commitments' },
+  { ar: 'صحة', en: 'Health' },
+  { ar: 'ترفيه', en: 'Entertainment' },
+  { ar: 'أخرى', en: 'Other' },
 ];
 
 /**
@@ -18,8 +31,12 @@ export const DEFAULT_CATEGORIES: Category[] = [
  * Unlike the prototype — which shipped one specific person's real figures as
  * its starting state — this is genuinely blank. Onboarding fills it in, which
  * is what makes the app usable by someone other than its author.
+ *
+ * `makeId` is injected so this module stays free of any id implementation. The
+ * app passes a UUID generator, because ids are used verbatim as Postgres
+ * primary keys during sync; tests can pass a counter for readable output.
  */
-export function emptyLedger(): Ledger {
+export function emptyLedger(makeId: () => string = defaultId): Ledger {
   return {
     bankOpen: 0,
     cashOpen: null,
@@ -36,7 +53,7 @@ export function emptyLedger(): Ledger {
     salActual: null,
     otEntries: [],
 
-    cats: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
+    cats: DEFAULT_CATEGORY_NAMES.map((c) => ({ ...c, id: makeId() })),
     budgets: {},
     commits: [],
     people: [],

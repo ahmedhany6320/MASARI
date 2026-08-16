@@ -3,6 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, I18nManager, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppLock } from '../src/components/AppLock';
+import { useNotificationSync } from '../src/hooks/useNotificationSync';
 import { useLocalization, usePalette } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 
@@ -19,6 +21,10 @@ export default function RootLayout() {
   const { rtl } = useLocalization();
   const p = usePalette();
   const theme = useLedger((s) => s.settings.theme);
+
+  // Keeps the scheduled notifications matching the current ledger. Safe to
+  // call before hydration — the hook waits for it.
+  useNotificationSync();
 
   useEffect(() => {
     // Arabic needs the whole layout mirrored, not just text right-aligned.
@@ -41,14 +47,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: p.bg } }}>
-        <Stack.Protected guard={!onboarded}>
-          <Stack.Screen name="onboarding" />
-        </Stack.Protected>
-        <Stack.Protected guard={onboarded}>
-          <Stack.Screen name="(tabs)" />
-        </Stack.Protected>
-      </Stack>
+      <AppLock>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: p.bg } }}>
+          <Stack.Protected guard={!onboarded}>
+            <Stack.Screen name="onboarding" />
+          </Stack.Protected>
+          <Stack.Protected guard={onboarded}>
+            <Stack.Screen name="(tabs)" />
+          </Stack.Protected>
+        </Stack>
+      </AppLock>
     </SafeAreaProvider>
   );
 }

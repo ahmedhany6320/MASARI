@@ -13,4 +13,5 @@ export * from './card';
 export * from './goals';
 export * from './overtime';
 export * from './safeSpend';
+export * from './notify';
 export * from './defaults';

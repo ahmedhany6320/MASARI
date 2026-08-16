@@ -1,7 +1,8 @@
 import { ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CloudSync } from '../../src/components/CloudSync';
+import { NotificationSettings } from '../../src/components/NotificationSettings';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../../src/components/ui';
-import { isSupabaseConfigured } from '../../src/lib/supabase';
 import {
   useCardPosition,
   useLocalization,
@@ -80,6 +81,8 @@ export default function MoreScreen() {
           </Caption>
         </Card>
 
+        <NotificationSettings />
+
         <Card>
           <Title>{t('settings')}</Title>
           <Row
@@ -94,27 +97,21 @@ export default function MoreScreen() {
           />
           <Row label={t('fxLabel')} value={num(settings.fxRate)} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACE.md }}>
-            <Body>{t('biometricLock')}</Body>
-            <Switch
-              value={settings.biometricLock}
-              onValueChange={setBiometricLock}
-              trackColor={{ true: p.accent, false: p.faint }}
-              accessibilityLabel={t('biometricLock')}
-            />
+          <View style={{ paddingVertical: SPACE.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
+              <Body style={{ flexShrink: 1 }}>{t('biometricLock')}</Body>
+              <Switch
+                value={settings.biometricLock}
+                onValueChange={setBiometricLock}
+                trackColor={{ true: p.accent, false: p.faint }}
+                accessibilityLabel={t('biometricLock')}
+              />
+            </View>
+            <Caption>{t('biometricHint')}</Caption>
           </View>
         </Card>
 
-        <Card>
-          <Title>{t('cloudT')}</Title>
-          {isSupabaseConfigured ? (
-            <Caption>{t('cloudReady')}</Caption>
-          ) : (
-            // Not an error state: Masari is designed to be fully usable with no
-            // account and no network at all.
-            <Caption>{t('cloudOffline')}</Caption>
-          )}
-        </Card>
+        <CloudSync />
 
         <Card>
           <Title>{t('dataBackup')}</Title>
