@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -96,7 +97,12 @@ export default function HomeScreen() {
           <View style={{ marginTop: SPACE.sm }}>
             <Row label={t('bankAcct')} value={money(c.bank)} />
             {c.cash != null && <Row label={t('cashAcct')} value={money(c.cash)} />}
-            <Row label={t('cardOut')} value={money(c.cc.out)} valueColor={p.negative} />
+            <Row
+              label={t('cardOut')}
+              value={money(c.cc.out)}
+              valueColor={p.negative}
+              onPress={() => router.push('/card')}
+            />
             <Row
               label={t('tomorrowLabel')}
               value={money(c.tomorrow)}

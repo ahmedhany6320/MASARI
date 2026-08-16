@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CloudSync } from '../../src/components/CloudSync';
@@ -22,18 +23,24 @@ import { SPACE } from '../../src/theme/tokens';
  */
 export default function MoreScreen() {
   const p = usePalette();
-  const { t, lang, money, num } = useLocalization();
+  const { t, lang, money, num, rtl } = useLocalization();
   const insets = useSafeAreaInsets();
 
   const c = useSafeSpend();
   const cc = useCardPosition();
   const sv = useSavingSummary();
 
+  const ledger = useLedger((s) => s.ledger);
   const settings = useLedger((s) => s.settings);
   const setLang = useLedger((s) => s.setLang);
   const setTheme = useLedger((s) => s.setTheme);
   const setBiometricLock = useLedger((s) => s.setBiometricLock);
   const reset = useLedger((s) => s.reset);
+
+  // Expected money still outstanding: receivables plus anything lent out.
+  const pendingRecv =
+    ledger.recv.filter((r) => r.status !== 'received').reduce((a, r) => a + r.amt, 0) +
+    ledger.people.filter((x) => x.dir === 'owed' && x.out > 0).reduce((a, x) => a + x.out, 0);
 
   return (
     <Screen>
@@ -49,15 +56,28 @@ export default function MoreScreen() {
         <View style={{ height: SPACE.lg }} />
 
         <Card>
-          <Title>{t('creditCard')}</Title>
-          <Row label={t('cardOut')} value={money(cc.out)} valueColor={p.negative} />
-          <Row label={t('stmtRem')} value={money(cc.stmtRem)} />
-          <Row label={t('unbilled')} value={money(cc.unbilled)} />
-          <Row label={t('instBal')} value={money(cc.instBal)} />
+          <Title>{t('manage')}</Title>
           <Row
-            label={t('availCard')}
-            value={money(cc.avail)}
-            valueColor={cc.avail > 0 ? p.positive : p.negative}
+            label={t('salaryWork')}
+            value={money(ledger.base)}
+            onPress={() => router.push('/salary')}
+          />
+          <Row
+            label={t('creditCard')}
+            value={cc.out > 0 ? money(cc.out) : t('cardSetupT')}
+            valueColor={cc.out > 0 ? p.negative : p.sub}
+            onPress={() => router.push('/card')}
+          />
+          <Row
+            label={t('intlTransfers')}
+            value={c.planT > 0 ? money(c.planT) : '—'}
+            onPress={() => router.push('/transfers')}
+          />
+          <Row
+            label={t('expMoneyLong')}
+            value={pendingRecv > 0 ? `≈ ${money(pendingRecv)}` : '—'}
+            valueColor={pendingRecv > 0 ? p.warn : p.sub}
+            onPress={() => router.push('/receivables')}
           />
         </Card>
 
@@ -98,7 +118,7 @@ export default function MoreScreen() {
           <Row label={t('fxLabel')} value={num(settings.fxRate)} />
 
           <View style={{ paddingVertical: SPACE.md }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
+            <View style={{ flexDirection: rtl ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
               <Body style={{ flexShrink: 1 }}>{t('biometricLock')}</Body>
               <Switch
                 value={settings.biometricLock}

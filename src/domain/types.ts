@@ -119,6 +119,8 @@ export interface Receivable {
 
 export interface Goal {
   id: string;
+  ar: string;
+  en: string;
   /**
    * Currency the target is denominated in. The prototype hardcoded this off
    * `id === 'egypt'`; that special case is still honoured when the field is
@@ -196,6 +198,12 @@ export interface Ledger {
   cardSetup: CardSetup | null;
   /** Manual correction to the unbilled figure. */
   cardAdj: number;
+  /**
+   * Why the card was last reconciled. The prototype required a documented
+   * reason for any manual override of a calculated figure; keeping it means a
+   * surprising card balance can still be explained months later.
+   */
+  cardAdjNote?: string | null;
 
   /** Monthly base salary. */
   base: number;

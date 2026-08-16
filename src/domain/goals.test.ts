@@ -5,7 +5,7 @@ import type { Goal } from './types';
 const FX = 13.6;
 
 function goal(over: Partial<Goal> = {}): Goal {
-  return { id: 'g1', target: null, alloc: 0, months: null, auto: false, ...over };
+  return { id: 'g1', ar: 'هدف', en: 'Goal', target: null, alloc: 0, months: null, auto: false, ...over };
 }
 
 describe('isEgpGoal', () => {

@@ -6,11 +6,17 @@ import {
   DEFAULT_FX_RATE,
   emptyLedger,
   type Account,
+  type CardConfig,
+  type CardSetup,
   type Commitment,
   type Goal,
   type Lang,
   type Ledger,
+  type OvertimeEntry,
   type Person,
+  type PlannedTransfer,
+  type Receivable,
+  type SalaryStatus,
   type Theme,
   type Tx,
   type TxType,
@@ -73,6 +79,36 @@ export interface LedgerStore {
   addPerson: (p: Omit<Person, 'id'>) => void;
   updatePerson: (id: string, patch: Partial<Person>) => void;
   removePerson: (id: string) => void;
+
+  addReceivable: (r: Omit<Receivable, 'id'>) => void;
+  updateReceivable: (id: string, patch: Partial<Receivable>) => void;
+  removeReceivable: (id: string) => void;
+  /** Marks a receivable arrived, posting the money into an account. */
+  receiveReceivable: (id: string, actual: number, acct: Account) => void;
+
+  addPlannedTransfer: (t: Omit<PlannedTransfer, 'id'>) => void;
+  removePlannedTransfer: (id: string) => void;
+  /** Records an executed international transfer, moving money out of the bank. */
+  sendTransfer: (args: { amt: number; purpose?: string; memo?: string; goalId?: string; egp?: number }) => void;
+
+  addOvertime: (e: Omit<OvertimeEntry, 'id'>) => void;
+  removeOvertime: (id: string) => void;
+
+  setCardSetup: (setup: CardSetup | null) => void;
+  setCardConfig: (cfg: Partial<CardConfig>) => void;
+  /** Reconciles the card, logging the correction as an auditable entry. */
+  reconcileCard: (delta: number, reason: string) => void;
+  /** Records a payment against the card statement. */
+  payCard: (amt: number, acct: Account) => void;
+
+  setSalaryStatus: (status: SalaryStatus, actual?: number | null) => void;
+  setSavingsTarget: (target: number | null) => void;
+
+  addCategory: (ar: string, en: string) => void;
+  removeCategory: (id: string) => void;
+
+  /** Settles money owed to or by a person. */
+  settlePerson: (id: string, amt: number, acct: Account) => void;
 
   setBudget: (catId: string, amount: number | null) => void;
   learnRule: (merchant: string, catId: string) => void;
@@ -187,6 +223,133 @@ export const useLedger = create<LedgerStore>()(
         })),
       removePerson: (id) =>
         set((s) => ({ ledger: { ...s.ledger, people: s.ledger.people.filter((p) => p.id !== id) } })),
+
+      // ---- receivables ----------------------------------------------------
+      addReceivable: (r) =>
+        set((s) => ({ ledger: { ...s.ledger, recv: [...s.ledger.recv, { ...r, id: newId() }] } })),
+      updateReceivable: (id, patch) =>
+        set((s) => ({
+          ledger: { ...s.ledger, recv: s.ledger.recv.map((r) => (r.id === id ? { ...r, ...patch } : r)) },
+        })),
+      removeReceivable: (id) =>
+        set((s) => ({ ledger: { ...s.ledger, recv: s.ledger.recv.filter((r) => r.id !== id) } })),
+
+      receiveReceivable: (id, actual, acct) => {
+        const r = get().ledger.recv.find((x) => x.id === id);
+        if (!r) return;
+        // Expected money only enters the balance once it has actually arrived,
+        // and at the amount that actually arrived — not the estimate.
+        get().addTx({
+          ts: Date.now(),
+          type: 'income',
+          acct,
+          amt: actual,
+          m: r.ar,
+          mEn: r.en,
+        });
+        get().updateReceivable(id, { status: 'received', actual });
+      },
+
+      // ---- transfers ------------------------------------------------------
+      addPlannedTransfer: (t) =>
+        set((s) => ({ ledger: { ...s.ledger, planTf: [...s.ledger.planTf, { ...t, id: newId() }] } })),
+      removePlannedTransfer: (id) =>
+        set((s) => ({ ledger: { ...s.ledger, planTf: s.ledger.planTf.filter((t) => t.id !== id) } })),
+
+      sendTransfer: ({ amt, purpose, memo, goalId, egp }) => {
+        get().addTx({
+          ts: Date.now(),
+          type: 'remit',
+          amt,
+          m: memo,
+          mEn: memo,
+          purpose: purpose ?? 'other',
+        });
+        // A transfer earmarked for a goal also credits that goal, in the goal's
+        // own currency — otherwise the money would leave the bank and vanish
+        // from the plan entirely.
+        if (goalId) {
+          const g = get().ledger.goals.find((x) => x.id === goalId);
+          if (g) {
+            const egpGoal = g.currency ? g.currency === 'EGP' : g.id === 'egypt';
+            get().updateGoal(goalId,
+              egpGoal && egp != null
+                ? { extEgp: (g.extEgp ?? 0) + egp }
+                : { alloc: g.alloc + amt },
+            );
+          }
+        }
+      },
+
+      // ---- overtime -------------------------------------------------------
+      addOvertime: (e) =>
+        set((s) => ({ ledger: { ...s.ledger, otEntries: [...s.ledger.otEntries, { ...e, id: newId() }] } })),
+      removeOvertime: (id) =>
+        set((s) => ({ ledger: { ...s.ledger, otEntries: s.ledger.otEntries.filter((e) => e.id !== id) } })),
+
+      // ---- card -----------------------------------------------------------
+      setCardSetup: (cardSetup) => set((s) => ({ ledger: { ...s.ledger, cardSetup } })),
+      setCardConfig: (cfg) =>
+        set((s) => ({ ledger: { ...s.ledger, cardCfg: { ...s.ledger.cardCfg, ...cfg } } })),
+
+      reconcileCard: (delta, reason) =>
+        set((s) => ({
+          ledger: {
+            ...s.ledger,
+            cardAdj: s.ledger.cardAdj + delta,
+            cardAdjNote: reason.trim() || s.ledger.cardAdjNote || null,
+          },
+        })),
+
+      payCard: (amt, acct) => {
+        get().addTx({ ts: Date.now(), type: 'ccpay', acct, amt, m: 'سداد البطاقة', mEn: 'Card payment' });
+      },
+
+      // ---- salary ---------------------------------------------------------
+      setSalaryStatus: (salStatus, salActual) =>
+        set((s) => ({
+          ledger: { ...s.ledger, salStatus, salActual: salActual ?? s.ledger.salActual },
+        })),
+      setSavingsTarget: (savTarget) => set((s) => ({ ledger: { ...s.ledger, savTarget } })),
+
+      // ---- categories -----------------------------------------------------
+      addCategory: (ar, en) =>
+        set((s) => ({
+          ledger: { ...s.ledger, cats: [...s.ledger.cats, { id: newId(), ar, en: en || ar }] },
+        })),
+      removeCategory: (id) =>
+        set((s) => {
+          const budgets = { ...s.ledger.budgets };
+          delete budgets[id];
+          return {
+            ledger: {
+              ...s.ledger,
+              cats: s.ledger.cats.filter((c) => c.id !== id),
+              budgets,
+              // Spending history outlives its category: the entries stay, they
+              // just lose the label. Deleting them would silently rewrite the
+              // month's totals.
+              tx: s.ledger.tx.map((x) => (x.cat === id ? { ...x, cat: null } : x)),
+            },
+          };
+        }),
+
+      // ---- people ---------------------------------------------------------
+      settlePerson: (id, amt, acct) => {
+        const person = get().ledger.people.find((p) => p.id === id);
+        if (!person) return;
+        // Paying someone you owe is money out; being repaid is money in.
+        get().addTx({
+          ts: Date.now(),
+          type: person.dir === 'owe' ? 'debtpay' : 'income',
+          acct,
+          amt,
+          m: `${person.dir === 'owe' ? 'سداد' : 'استلام من'} — ${person.name}`,
+          mEn: `${person.dir === 'owe' ? 'Payment' : 'Received from'} — ${person.name}`,
+          personId: id,
+        });
+        get().updatePerson(id, { out: Math.max(0, person.out - amt) });
+      },
 
       setBudget: (catId, amount) =>
         set((s) => {

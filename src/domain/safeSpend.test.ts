@@ -26,7 +26,7 @@ function commitment(amt: number, over: Partial<Commitment> = {}): Commitment {
   return { id: `k${seq++}`, ar: '', en: '', amt, day: 5, paused: false, paidMonth: false, ...over };
 }
 function goal(over: Partial<Goal> = {}): Goal {
-  return { id: `g${seq++}`, target: null, alloc: 0, months: null, auto: false, ...over };
+  return { id: `g${seq++}`, ar: 'هدف', en: 'Goal', target: null, alloc: 0, months: null, auto: false, ...over };
 }
 function ledger(over: Partial<Ledger> = {}): Ledger {
   return { ...emptyLedger(), base: 11000, ...over };

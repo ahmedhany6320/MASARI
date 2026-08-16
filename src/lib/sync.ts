@@ -145,8 +145,8 @@ export async function pushLedger(
     await replaceCollection(sb, 'goals', userId, goals.rows, (g: Goal) => ({
       id: g.id,
       user_id: userId,
-      name_ar: g.id,
-      name_en: g.id,
+      name_ar: g.ar,
+      name_en: g.en,
       currency: g.currency ?? (g.id === 'egypt' ? 'EGP' : 'AED'),
       target: g.target,
       allocated: g.alloc,
@@ -277,6 +277,8 @@ export async function pullLedger(): Promise<{ result: PulledLedger | null; error
       recv: [],
       goals: (goals.data ?? []).map((g: Record<string, unknown>) => ({
         id: String(g.id),
+        ar: String(g.name_ar ?? ''),
+        en: String(g.name_en ?? ''),
         currency: g.currency === 'EGP' ? 'EGP' : 'AED',
         target: g.target == null ? null : Number(g.target),
         alloc: num(g.allocated),

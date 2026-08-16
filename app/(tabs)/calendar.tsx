@@ -92,7 +92,7 @@ export default function CalendarScreen() {
         </View>
 
         <Card>
-          <View style={styles.grid}>
+          <View style={[styles.grid, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
             {cells.map((day, i) => {
               if (day == null) return <View key={`pad${i}`} style={styles.cell} />;
               const spent = spendByDay.get(day) ?? 0;
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: SPACE.lg,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  grid: { flexWrap: 'wrap' },
   cell: {
     width: `${100 / 7}%`,
     aspectRatio: 1,

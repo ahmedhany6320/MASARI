@@ -26,7 +26,7 @@ const EVENING_HOURS = [18, 19, 20, 21, 22, 23] as const;
  */
 export function NotificationSettings() {
   const p = usePalette();
-  const { t, lang } = useLocalization();
+  const { t, lang, rtl } = useLocalization();
 
   const ledger = useLedger((s) => s.ledger);
   const fxRate = useLedger((s) => s.settings.fxRate);
@@ -67,7 +67,7 @@ export function NotificationSettings() {
 
   const row = (label: string, hint: string, value: boolean, onChange: (v: boolean) => void) => (
     <View style={{ paddingVertical: SPACE.md }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
+      <View style={{ flexDirection: rtl ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
         <Body style={{ flexShrink: 1 }}>{label}</Body>
         <Switch
           value={value}
@@ -89,7 +89,7 @@ export function NotificationSettings() {
   ) => (
     <View style={{ paddingVertical: SPACE.sm }}>
       <Caption>{label}</Caption>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm, marginTop: SPACE.sm }}>
+      <View style={{ flexDirection: rtl ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: SPACE.sm, marginTop: SPACE.sm }}>
         {hours.map((h) => {
           const on = h === current;
           return (

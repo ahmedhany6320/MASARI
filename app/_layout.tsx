@@ -27,14 +27,19 @@ export default function RootLayout() {
   useNotificationSync();
 
   useEffect(() => {
-    // Arabic needs the whole layout mirrored, not just text right-aligned.
-    // Note that on a real device a change here only takes full effect after a
-    // reload — React Native resolves layout direction natively at startup.
-    if (I18nManager.isRTL !== rtl) {
-      I18nManager.allowRTL(rtl);
-      I18nManager.forceRTL(rtl);
+    // Direction is handled explicitly in every component (`row-reverse` and
+    // `textAlign` driven by the active language), NOT delegated to
+    // I18nManager. Calling forceRTL here as well would mirror the layout a
+    // second time at the native level and flip it straight back to LTR.
+    //
+    // Doing it in JS also means switching language takes effect immediately —
+    // forceRTL only applies after a full app restart, which would leave the
+    // user staring at a half-flipped screen until they killed the app.
+    if (I18nManager.isRTL) {
+      I18nManager.allowRTL(false);
+      I18nManager.forceRTL(false);
     }
-  }, [rtl]);
+  }, []);
 
   if (!hydrated) {
     return (
@@ -54,6 +59,12 @@ export default function RootLayout() {
           </Stack.Protected>
           <Stack.Protected guard={onboarded}>
             <Stack.Screen name="(tabs)" />
+            {/* Detail screens, pushed over the tabs rather than living in them:
+                they are destinations you visit and leave, not places you dwell. */}
+            <Stack.Screen name="salary" />
+            <Stack.Screen name="card" />
+            <Stack.Screen name="transfers" />
+            <Stack.Screen name="receivables" />
           </Stack.Protected>
         </Stack>
       </AppLock>
