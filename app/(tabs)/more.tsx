@@ -3,6 +3,8 @@ import { ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CloudSync } from '../../src/components/CloudSync';
 import { NotificationSettings } from '../../src/components/NotificationSettings';
+import { RestoreBackup } from '../../src/components/RestoreBackup';
+import { Tile, TileGrid } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../../src/components/ui';
 import {
   useCardPosition,
@@ -15,11 +17,11 @@ import { useLedger } from '../../src/store/useLedger';
 import { SPACE } from '../../src/theme/tokens';
 
 /**
- * More — settings, the card, and the month's report.
+ * More — the hub.
  *
- * The prototype nested eight sub-screens under here; this collects the ones
- * that carry real information into a single scroll, which is cheaper to read
- * than a menu of menus.
+ * Built from large tiles rather than list rows: this is used one-handed and
+ * often standing, and each tile carries its own live figure so most questions
+ * are answered without opening anything.
  */
 export default function MoreScreen() {
   const p = usePalette();
@@ -42,6 +44,11 @@ export default function MoreScreen() {
     ledger.recv.filter((r) => r.status !== 'received').reduce((a, r) => a + r.amt, 0) +
     ledger.people.filter((x) => x.dir === 'owed' && x.out > 0).reduce((a, x) => a + x.out, 0);
 
+  // Things that need attention, surfaced as tile badges rather than buried.
+  const cardNeedsSetup = ledger.cardSetup == null && ledger.cardCfg.limit === 0;
+  const goalNeedsDeadline = ledger.goals.some((g) => g.target != null && g.months == null);
+  const salaryPending = ledger.salStatus !== 'received';
+
   return (
     <Screen>
       <ScrollView
@@ -52,34 +59,62 @@ export default function MoreScreen() {
         }}
       >
         <Title>{t('navMore')}</Title>
-
         <View style={{ height: SPACE.lg }} />
 
-        <Card>
-          <Title>{t('manage')}</Title>
-          <Row
+        <TileGrid>
+          <Tile
+            icon="📊"
+            label={t('insights')}
+            value={money(c.livingPool)}
+            valueColor={p.accent}
+            hint={t('insightsHint')}
+            onPress={() => router.push('/insights')}
+            badge={goalNeedsDeadline}
+          />
+          <Tile
+            icon="💼"
             label={t('salaryWork')}
             value={money(ledger.base)}
+            hint={salaryPending ? t('expectedStatus') : t('received')}
             onPress={() => router.push('/salary')}
+            badge={salaryPending}
           />
-          <Row
+          <Tile
+            icon="💳"
             label={t('creditCard')}
-            value={cc.out > 0 ? money(cc.out) : t('cardSetupT')}
+            value={cardNeedsSetup ? t('cardSetupT') : money(cc.out)}
             valueColor={cc.out > 0 ? p.negative : p.sub}
+            hint={cardNeedsSetup ? undefined : `${t('availCard')} ${money(cc.avail)}`}
             onPress={() => router.push('/card')}
+            badge={cardNeedsSetup}
           />
-          <Row
+          <Tile
+            icon="🌍"
             label={t('intlTransfers')}
             value={c.planT > 0 ? money(c.planT) : '—'}
+            hint={`${num(settings.fxRate)} ${lang === 'ar' ? 'ج.م' : 'EGP'}`}
             onPress={() => router.push('/transfers')}
           />
-          <Row
+          <Tile
+            icon="⏳"
             label={t('expMoneyLong')}
             value={pendingRecv > 0 ? `≈ ${money(pendingRecv)}` : '—'}
             valueColor={pendingRecv > 0 ? p.warn : p.sub}
+            hint={t('notCounted')}
             onPress={() => router.push('/receivables')}
           />
-        </Card>
+          <Tile
+            icon="🎯"
+            label={t('goals')}
+            value={c.goalReq > 0 ? money(c.goalReq) : '—'}
+            valueColor={c.goalReq > 0 ? p.accentDeep : p.sub}
+            hint={goalNeedsDeadline ? t('noDeadlineShort') : undefined}
+            onPress={() => router.push('/(tabs)/plan')}
+            badge={goalNeedsDeadline}
+          />
+        </TileGrid>
+
+        <View style={{ height: SPACE.lg }} />
 
         <Card>
           <Title>{t('report')}</Title>
@@ -115,10 +150,21 @@ export default function MoreScreen() {
             value={settings.theme === 'dark' ? t('dark') : t('light')}
             onPress={() => setTheme(settings.theme === 'dark' ? 'light' : 'dark')}
           />
-          <Row label={t('fxLabel')} value={num(settings.fxRate)} />
+          <Row
+            label={t('fxLabel')}
+            value={num(settings.fxRate)}
+            onPress={() => router.push('/transfers')}
+          />
 
           <View style={{ paddingVertical: SPACE.md }}>
-            <View style={{ flexDirection: rtl ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.md }}>
+            <View
+              style={{
+                flexDirection: rtl ? 'row-reverse' : 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: SPACE.md,
+              }}
+            >
               <Body style={{ flexShrink: 1 }}>{t('biometricLock')}</Body>
               <Switch
                 value={settings.biometricLock}
@@ -132,6 +178,8 @@ export default function MoreScreen() {
         </Card>
 
         <CloudSync />
+
+        <RestoreBackup />
 
         <Card>
           <Title>{t('dataBackup')}</Title>

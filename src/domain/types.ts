@@ -31,6 +31,8 @@ export type Account = 'bank' | 'cash' | 'card';
  * - `adjust`    reconciliation correction against the bank (signed)
  * - `lend`      money lent to a person
  * - `borrow`    money borrowed from a person
+ * - `cardadj`   card reconciliation, kept for history — it moves no balance,
+ *               because the correction itself lives in `Ledger.cardAdj`
  */
 export type TxType =
   | 'income'
@@ -42,7 +44,8 @@ export type TxType =
   | 'dep'
   | 'adjust'
   | 'lend'
-  | 'borrow';
+  | 'borrow'
+  | 'cardadj';
 
 export interface Tx {
   id: string;

@@ -61,6 +61,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             {/* Detail screens, pushed over the tabs rather than living in them:
                 they are destinations you visit and leave, not places you dwell. */}
+            <Stack.Screen name="insights" />
             <Stack.Screen name="salary" />
             <Stack.Screen name="card" />
             <Stack.Screen name="transfers" />

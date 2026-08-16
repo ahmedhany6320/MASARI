@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QuickAdd } from '../../src/components/QuickAdd';
+import { QuickAction } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import { formatShortDate } from '../../src/i18n';
 import { useLocalization, usePalette, useSafeSpend } from '../../src/store/selectors';
@@ -118,7 +119,11 @@ export default function HomeScreen() {
           </Body>
         </Card>
 
-        <Button label={t('addExpense')} onPress={() => setAdding(true)} />
+        {/* Recording a spend is by far the most frequent action, so it gets a
+            full-width primary target rather than a row in a menu. */}
+        <QuickAction icon="＋" label={t('addExpense')} primary onPress={() => setAdding(true)} />
+        <View style={{ height: SPACE.sm }} />
+        <QuickAction icon="📊" label={t('insights')} onPress={() => router.push('/insights')} />
       </ScrollView>
 
       <QuickAdd visible={adding} onClose={() => setAdding(false)} />

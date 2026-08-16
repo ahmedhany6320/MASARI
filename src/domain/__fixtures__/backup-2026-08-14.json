@@ -1,0 +1,700 @@
+{
+  "__v": 1,
+  "savedAt": 1786687000240,
+  "data": {
+    "lang": "ar",
+    "theme": "light",
+    "tab": "more",
+    "ob": 2,
+    "obDone": true,
+    "sslOpen": true,
+    "seg": "goals",
+    "buffer": 0,
+    "cardFromSalary": true,
+    "bankOpen": 23800,
+    "lastRecStr": "14 أغسطس 2026",
+    "cashOpen": 0,
+    "cardCfg": {
+      "limit": 20000,
+      "closeDay": 1,
+      "dueDay": 25
+    },
+    "cardSetup": {
+      "stmt0": 1286,
+      "unbilled0": 0,
+      "instBal": 2653,
+      "instMo": 0
+    },
+    "cardAdj": 108.9799999999999,
+    "base": 11000,
+    "salStatus": "expected",
+    "salActual": null,
+    "otEntries": [
+      {
+        "id": "ot1786684880997",
+        "date": "2026-08-01",
+        "h": 12,
+        "rate": 56.41025641025641,
+        "mult": 1.25
+      }
+    ],
+    "otH": "",
+    "otRate": "56.41025641025641",
+    "otMult": "1.25",
+    "otDate": "2026-08-01",
+    "cats": [
+      {
+        "id": "c1",
+        "ar": "بقالة",
+        "en": "Groceries"
+      },
+      {
+        "id": "c2",
+        "ar": "مطاعم",
+        "en": "Restaurants"
+      },
+      {
+        "id": "c3",
+        "ar": "مواصلات",
+        "en": "Transport"
+      },
+      {
+        "id": "c4",
+        "ar": "فواتير والتزامات",
+        "en": "Bills & commitments"
+      },
+      {
+        "id": "c5",
+        "ar": "صحة",
+        "en": "Health"
+      },
+      {
+        "id": "c6",
+        "ar": "ترفيه",
+        "en": "Entertainment"
+      },
+      {
+        "id": "c7",
+        "ar": "أخرى",
+        "en": "Other"
+      }
+    ],
+    "budgets": {},
+    "newCat": "",
+    "commits": [
+      {
+        "id": "pi",
+        "ar": "الهاتف والإنترنت",
+        "en": "Phone & Internet",
+        "amt": null,
+        "day": null,
+        "paused": false,
+        "paidMonth": false
+      }
+    ],
+    "nc": {
+      "name": "",
+      "amt": "",
+      "day": ""
+    },
+    "people": [
+      {
+        "id": "pp1786685076190",
+        "name": "حسان",
+        "amt": 1000,
+        "out": 0,
+        "dir": "owed",
+        "fromAcct": "bank"
+      },
+      {
+        "id": "pp1786685100716",
+        "name": "حسان",
+        "amt": 300,
+        "out": 300,
+        "dir": "owed",
+        "fromAcct": "bank"
+      },
+      {
+        "id": "pp1786685112542",
+        "name": "اسامة مهدى",
+        "amt": 300,
+        "out": 300,
+        "dir": "owed",
+        "fromAcct": "bank"
+      }
+    ],
+    "np": {
+      "name": "",
+      "amt": "",
+      "dir": "owed"
+    },
+    "recv": [
+      {
+        "id": "metlife",
+        "ar": "MetLife — تعويض تأمين",
+        "en": "MetLife — insurance reimbursement",
+        "amt": 438,
+        "exact": false,
+        "status": "received",
+        "actual": 438
+      }
+    ],
+    "goals": [
+      {
+        "id": "egypt",
+        "target": 1100000,
+        "alloc": 0,
+        "months": null,
+        "extEgp": 0,
+        "auto": false
+      },
+      {
+        "id": "emg",
+        "target": null,
+        "alloc": 0,
+        "months": null,
+        "auto": false
+      }
+    ],
+    "transfers": [
+      {
+        "id": "tf1786684682815",
+        "ts": 1786684682815,
+        "amt": 192.23,
+        "fee": 0,
+        "rate": 13.6,
+        "to": "دعم الخطيبة",
+        "purpose": "fiancee",
+        "status": "completed"
+      },
+      {
+        "id": "tf1786684632628",
+        "ts": 1786684632628,
+        "amt": 192.23,
+        "fee": 0,
+        "rate": 13.6,
+        "to": "دعم الخطيبة",
+        "purpose": "fiancee",
+        "status": "completed"
+      },
+      {
+        "id": "tf1786684607683",
+        "ts": 1786684607683,
+        "amt": 266,
+        "fee": 0,
+        "rate": 13.6,
+        "to": "دعم الخطيبة",
+        "purpose": "fiancee",
+        "status": "completed"
+      }
+    ],
+    "planTf": [],
+    "tf": {
+      "amt": "",
+      "fee": "",
+      "rate": "13.6",
+      "to": "",
+      "purpose": "fiancee"
+    },
+    "pt": {
+      "amt": "",
+      "day": ""
+    },
+    "savTarget": null,
+    "hist": [],
+    "closeArm": false,
+    "remInt": "4h",
+    "remStart": "09:00",
+    "remEnd": "22:00",
+    "morning": true,
+    "evening": true,
+    "tx": [
+      {
+        "id": "u1786685740667",
+        "ts": 1786685740667,
+        "type": "adjust",
+        "cat": null,
+        "m": "تسوية رصيد — خطا ف الحسابات",
+        "mEn": "Reconciliation — خطا ف الحسابات",
+        "acct": "bank",
+        "amt": -1132.5400000000009
+      },
+      {
+        "id": "u1786685659889",
+        "ts": 1786685659889,
+        "type": "cardadj",
+        "cat": null,
+        "m": "تسوية بطاقة — خطا",
+        "mEn": "Card reconciliation — خطا",
+        "acct": "card",
+        "amt": 108.9799999999999
+      },
+      {
+        "id": "u1786685196839",
+        "ts": 1786685196839,
+        "type": "income",
+        "cat": null,
+        "m": "دخل نقدي خارجي",
+        "mEn": "External cash income",
+        "acct": "cash",
+        "amt": 100
+      },
+      {
+        "id": "u1786685182258",
+        "ts": 1786685182258,
+        "type": "wd",
+        "cat": null,
+        "m": "سحب نقدي من البنك",
+        "mEn": "Cash withdrawal",
+        "acct": "bank",
+        "amt": 100
+      },
+      {
+        "id": "u1786685112542",
+        "ts": 1786685112542,
+        "type": "lend",
+        "cat": null,
+        "m": "سلفة لـاسامة مهدى",
+        "mEn": "Lent to اسامة مهدى",
+        "acct": "bank",
+        "amt": 300
+      },
+      {
+        "id": "u1786685100716",
+        "ts": 1786685100716,
+        "type": "lend",
+        "cat": null,
+        "m": "سلفة لـحسان",
+        "mEn": "Lent to حسان",
+        "acct": "bank",
+        "amt": 300
+      },
+      {
+        "id": "u1786685091176",
+        "ts": 1786685091176,
+        "type": "income",
+        "cat": null,
+        "m": "استلام من حسان",
+        "mEn": "Received from حسان",
+        "acct": "bank",
+        "amt": 1000,
+        "personId": "pp1786685076190",
+        "back": 1000
+      },
+      {
+        "id": "u1786685076190",
+        "ts": 1786685076190,
+        "type": "lend",
+        "cat": null,
+        "m": "سلفة لـحسان",
+        "mEn": "Lent to حسان",
+        "acct": "bank",
+        "amt": 1000
+      },
+      {
+        "id": "u1786685047092",
+        "ts": 1786685047092,
+        "type": "borrow",
+        "cat": null,
+        "m": "استلاف من حسان",
+        "mEn": "Borrowed from حسان",
+        "acct": "bank",
+        "amt": 1300
+      },
+      {
+        "id": "u1786684682815",
+        "ts": 1786684682815,
+        "type": "remit",
+        "cat": null,
+        "m": "حوالة إلى دعم الخطيبة",
+        "mEn": "Transfer to دعم الخطيبة",
+        "acct": "bank",
+        "amt": 192.23,
+        "purpose": "fiancee"
+      },
+      {
+        "id": "u1786684632628",
+        "ts": 1786684632628,
+        "type": "remit",
+        "cat": null,
+        "m": "حوالة إلى دعم الخطيبة",
+        "mEn": "Transfer to دعم الخطيبة",
+        "acct": "bank",
+        "amt": 192.23,
+        "purpose": "fiancee"
+      },
+      {
+        "id": "u1786684607683",
+        "ts": 1786684607683,
+        "type": "remit",
+        "cat": null,
+        "m": "حوالة إلى دعم الخطيبة",
+        "mEn": "Transfer to دعم الخطيبة",
+        "acct": "bank",
+        "amt": 266,
+        "purpose": "fiancee"
+      },
+      {
+        "id": "u1786684409613",
+        "ts": 1786684409613,
+        "type": "income",
+        "cat": null,
+        "m": "استلام — MetLife — تعويض تأمين",
+        "mEn": "Received — MetLife — insurance reimbursement",
+        "acct": "bank",
+        "amt": 438,
+        "recvId": "metlife"
+      },
+      {
+        "id": "u1786684375906",
+        "ts": 1786684375906,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 13.5
+      },
+      {
+        "id": "u1786684362141",
+        "ts": 1786608000000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "Mango",
+        "mEn": "Mango",
+        "acct": "card",
+        "amt": 9
+      },
+      {
+        "id": "u1786684351376",
+        "ts": 1786608000000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 34
+      },
+      {
+        "id": "u1786684344085",
+        "ts": 1786608000000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 14.5
+      },
+      {
+        "id": "u1786684308869",
+        "ts": 1786521600000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Keeta",
+        "mEn": "Keeta",
+        "acct": "card",
+        "amt": 35.64
+      },
+      {
+        "id": "u1786684295459",
+        "ts": 1786521600000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "قدرت عمر",
+        "mEn": "قدرت عمر",
+        "acct": "card",
+        "amt": 7.5
+      },
+      {
+        "id": "u1786684209790",
+        "ts": 1786521600000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 13.9
+      },
+      {
+        "id": "u1786684187313",
+        "ts": 1786435200000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Keeta",
+        "mEn": "Keeta",
+        "acct": "card",
+        "amt": 37.4
+      },
+      {
+        "id": "u1786684174643",
+        "ts": 1786435200000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 13.5
+      },
+      {
+        "id": "u1786684163781",
+        "ts": 1786435200000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "Mango",
+        "mEn": "Mango",
+        "acct": "card",
+        "amt": 10.99
+      },
+      {
+        "id": "u1786684155866",
+        "ts": 1786435200000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "Mango",
+        "mEn": "Mango",
+        "acct": "card",
+        "amt": 11.74
+      },
+      {
+        "id": "u1786684117856",
+        "ts": 1786348800000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "قدرت عمر",
+        "mEn": "قدرت عمر",
+        "acct": "card",
+        "amt": 14.5
+      },
+      {
+        "id": "u1786684082655",
+        "ts": 1786348800000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "Mango",
+        "mEn": "Mango",
+        "acct": "card",
+        "amt": 4.25
+      },
+      {
+        "id": "u1786683993944",
+        "ts": 1786262400000,
+        "type": "expense",
+        "cat": "c4",
+        "m": "اشتراك كلود Ai",
+        "mEn": "اشتراك كلود Ai",
+        "acct": "card",
+        "amt": 79.55
+      },
+      {
+        "id": "u1786683965219",
+        "ts": 1786262400000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "قدرت عمر",
+        "mEn": "قدرت عمر",
+        "acct": "card",
+        "amt": 7.5
+      },
+      {
+        "id": "u1786683959339",
+        "ts": 1786262400000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 8.5
+      },
+      {
+        "id": "u1786683858780",
+        "ts": 1786176000000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Talabat",
+        "mEn": "Talabat",
+        "acct": "card",
+        "amt": 36
+      },
+      {
+        "id": "u1786683833748",
+        "ts": 1786176000000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 15.5
+      },
+      {
+        "id": "u1786683815958",
+        "ts": 1786176000000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 12.5
+      },
+      {
+        "id": "u1786683770483",
+        "ts": 1786089600000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 13.5
+      },
+      {
+        "id": "u1786683754445",
+        "ts": 1786089600000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "Mango",
+        "mEn": "Mango",
+        "acct": "card",
+        "amt": 80.19
+      },
+      {
+        "id": "u1786683733236",
+        "ts": 1786089600000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Keeta",
+        "mEn": "Keeta",
+        "acct": "card",
+        "amt": 27.5
+      },
+      {
+        "id": "u1786683719879",
+        "ts": 1786089600000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "قدرت عمر",
+        "mEn": "قدرت عمر",
+        "acct": "card",
+        "amt": 7.5
+      },
+      {
+        "id": "u1786683628348",
+        "ts": 1786003200000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "قدرت عمر",
+        "mEn": "قدرت عمر",
+        "acct": "card",
+        "amt": 22.5
+      },
+      {
+        "id": "u1786683619640",
+        "ts": 1786003200000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "فريد ",
+        "mEn": "فريد ",
+        "acct": "card",
+        "amt": 2.5
+      },
+      {
+        "id": "u1786683528423",
+        "ts": 1785916800000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 13.5
+      },
+      {
+        "id": "u1786683506633",
+        "ts": 1785916800000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "قدرت عمر",
+        "mEn": "قدرت عمر",
+        "acct": "card",
+        "amt": 9
+      },
+      {
+        "id": "u1786683457832",
+        "ts": 1785916800000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "Mango",
+        "mEn": "Mango",
+        "acct": "card",
+        "amt": 81.15
+      },
+      {
+        "id": "u1786683398099",
+        "ts": 1785830400000,
+        "type": "expense",
+        "cat": "c1",
+        "m": "Mango",
+        "mEn": "Mango",
+        "acct": "card",
+        "amt": 2.5
+      },
+      {
+        "id": "u1786683343573",
+        "ts": 1785830400000,
+        "type": "expense",
+        "cat": "c2",
+        "m": "Famous ",
+        "mEn": "Famous ",
+        "acct": "card",
+        "amt": 42
+      },
+      {
+        "id": "s1",
+        "ts": 1785528000000,
+        "type": "income",
+        "cat": null,
+        "m": "راتب يوليو (فترة عمل يوليو)",
+        "mEn": "July salary (July work period)",
+        "acct": "bank",
+        "amt": 11000,
+        "post": false
+      }
+    ],
+    "rules": {
+      "famous": "c2",
+      "mango": "c1",
+      "قدرت عمر": "c1",
+      "فريد": "c1",
+      "keeta": "c2",
+      "talabat": "c2",
+      "اشتراك كلود ai": "c4"
+    },
+    "qaAmt": "",
+    "qaCat": "c2",
+    "qaAcct": "card",
+    "qaMerch": "",
+    "rulePrompt": null,
+    "moreView": "data",
+    "notifPerm": "granted",
+    "notifLevel": 0,
+    "calOff": 0,
+    "calSel": 4,
+    "calSync": false,
+    "allocOpen": "egypt",
+    "lastBackupTs": null,
+    "cloud": {
+      "url": "",
+      "key": "",
+      "id": "",
+      "on": false
+    },
+    "cloudDraft": {
+      "url": "",
+      "key": "",
+      "id": ""
+    },
+    "cloudAt": null,
+    "cloudBusy": false,
+    "swReady": true,
+    "qaDate": "2026-08-14",
+    "cardDraft": null,
+    "cfgDraft": null
+  }
+}

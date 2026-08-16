@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RestoreBackup } from '../src/components/RestoreBackup';
 import { Body, Button, Caption, Card, Screen, Title } from '../src/components/ui';
 import { parseAmount } from '../src/domain';
 import { useLocalization, usePalette } from '../src/store/selectors';
@@ -127,6 +128,13 @@ export default function OnboardingScreen() {
           )}
 
           <Button label={t('start')} onPress={finish} disabled={!canFinish} />
+
+          {/* Someone arriving from the old PWA already has months of history.
+              Offering restore here, before they type anything, saves them
+              re-entering all of it. */}
+          <View style={{ marginTop: SPACE.xl }}>
+            <RestoreBackup />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

@@ -14,4 +14,6 @@ export * from './goals';
 export * from './overtime';
 export * from './safeSpend';
 export * from './notify';
+export * from './importBackup';
+export * from './insights';
 export * from './defaults';
