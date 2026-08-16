@@ -90,13 +90,20 @@ export const RADIUS = {
   pill: 999,
 } as const;
 
-/** Type scale, in points. */
+/**
+ * Type scale, in points.
+ *
+ * Sized up from the original port after real use: Arabic script carries more
+ * detail per glyph than Latin at the same point size, and this is read at
+ * arm's length, often in a shop. `micro` is the floor — nothing meaningful
+ * should be smaller than this.
+ */
 export const FONT = {
-  micro: 11,
-  small: 13,
-  body: 15,
-  title: 18,
-  large: 24,
+  micro: 12,
+  small: 14,
+  body: 16,
+  title: 20,
+  large: 26,
   /** The Safe Spend Limit itself — the one number the whole app exists to show. */
-  hero: 46,
+  hero: 48,
 } as const;

@@ -111,6 +111,12 @@ export default function OnboardingScreen() {
             />
           </View>
 
+          {/* Restore comes FIRST. Anyone with existing history should not have
+              to type three figures they are about to overwrite anyway. */}
+          <RestoreBackup />
+
+          <Caption style={{ marginVertical: SPACE.lg }}>{t('orStartFresh')}</Caption>
+
           <Card>
             {field(t('salaryWork'), t('salaryHint'), salary, setSalary, true)}
             {field(t('bankAcct'), t('bankHint'), bank, setBank)}
@@ -128,13 +134,6 @@ export default function OnboardingScreen() {
           )}
 
           <Button label={t('start')} onPress={finish} disabled={!canFinish} />
-
-          {/* Someone arriving from the old PWA already has months of history.
-              Offering restore here, before they type anything, saves them
-              re-entering all of it. */}
-          <View style={{ marginTop: SPACE.xl }}>
-            <RestoreBackup />
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

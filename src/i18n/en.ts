@@ -441,4 +441,10 @@ export const en: Record<StringKey, string> = {
   restoreConfirm: 'This replaces the data on this device with the backup. Are you sure?',
   restoreDone: 'Restored successfully.',
   restoreWarnings: 'Notes:',
+  seedT: 'Start with your data',
+  seedBtn: 'Start with my saved data',
+  seedFrom: 'Backup from',
+  seedConfirm: 'This loads the backup bundled inside the app — balances, transactions, card, people and goals. It replaces anything currently on this device.',
+  pasteBackup: 'Or paste another backup',
+  orStartFresh: 'Or start fresh and enter your figures:',
 };

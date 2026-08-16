@@ -439,6 +439,12 @@ export const ar = {
   restoreConfirm: 'ده هيمسح بيانات الجهاز الحالية ويحط النسخة دي مكانها. متأكد؟',
   restoreDone: 'تمت الاستعادة بنجاح.',
   restoreWarnings: 'ملاحظات:',
+  seedT: 'ابدأ ببياناتك',
+  seedBtn: 'ابدأ ببياناتي المحفوظة',
+  seedFrom: 'نسخة بتاريخ',
+  seedConfirm: 'هنحمّل بياناتك المحفوظة جوه التطبيق — الأرصدة والعمليات والبطاقة والأشخاص والأهداف كلها. ده هيمسح أي بيانات على الجهاز دلوقتي.',
+  pasteBackup: 'أو الصق نسخة تانية',
+  orStartFresh: 'أو ابدأ من الأول وسجّل بياناتك بنفسك:',
 } as const;
 
 export type StringKey = keyof typeof ar;
