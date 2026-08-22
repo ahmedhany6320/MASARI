@@ -17,4 +17,5 @@ export * from './notify';
 export * from './importBackup';
 export * from './insights';
 export * from './goalPlan';
+export * from './adaptive';
 export * from './defaults';

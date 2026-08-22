@@ -5,16 +5,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, Sheet, TextField } from '../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../src/components/ui';
 import {
+  adaptiveOutlook,
   formatAmount,
   goalPlan,
   goalScenarios,
+  horizonTracker,
   isEgpGoal,
   parseAmount,
   projectGoal,
   requirementFor,
+  type GoalMode,
 } from '../src/domain';
 import { MONTHS } from '../src/i18n';
-import { useCapacity, useLocalization, usePalette } from '../src/store/selectors';
+import { useCapacity, useLocalization, usePalette, useSafeSpend } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 import { FONT, RADIUS, SPACE } from '../src/theme/tokens';
 
@@ -41,7 +44,12 @@ export default function GoalPlanScreen() {
   const ledger = useLedger((s) => s.ledger);
   const fxRate = useLedger((s) => s.settings.fxRate);
   const updateGoal = useLedger((s) => s.updateGoal);
+  const setMinDailySpend = useLedger((s) => s.setMinDailySpend);
+  const setGoalMode = useLedger((s) => s.setGoalMode);
   const capacity = useCapacity();
+  const spend = useSafeSpend();
+
+  const minDaily = ledger.minDailySpend ?? 0;
 
   const goals = ledger.goals.filter((g) => g.target != null);
   const [selectedId, setSelectedId] = useState<string | null>(params.id ?? goals[0]?.id ?? null);
@@ -50,6 +58,8 @@ export default function GoalPlanScreen() {
   const [horizon, setHorizon] = useState<number>(12);
   const [editing, setEditing] = useState(false);
   const [targetDraft, setTargetDraft] = useState('');
+  const [floorSheet, setFloorSheet] = useState(false);
+  const [floorDraft, setFloorDraft] = useState('');
 
   const now = useMemo(() => new Date(), []);
 
@@ -75,6 +85,19 @@ export default function GoalPlanScreen() {
   const egp = isEgpGoal(goal);
   const cur = egp ? (lang === 'ar' ? 'ج.م' : 'EGP') : lang === 'ar' ? 'د.إ' : 'AED';
   const fmt = (n: number) => `${formatAmount(n)} ${cur}`;
+
+  const mode: GoalMode = ledger.goalMode?.[goal.id] ?? 'horizon';
+  const outlook = adaptiveOutlook(goal, capacity, minDaily, fxRate);
+  const track = horizonTracker(
+    goal,
+    capacity,
+    minDaily,
+    horizon,
+    fxRate,
+    now,
+    spend.flexToday,
+    spend.allowance,
+  );
 
   const plan = goalPlan(goal, capacity, fxRate, now);
   const at = projectGoal(goal, capacity, fxRate, horizon);
@@ -144,6 +167,108 @@ export default function GoalPlanScreen() {
             />
           </View>
         </Card>
+
+        {/* ---- living floor ---- */}
+        <Card>
+          <Title>{t('livingFloorT')}</Title>
+          <Caption>{t('livingFloorNote')}</Caption>
+          <View style={{ marginTop: SPACE.sm }}>
+            <Row
+              label={t('minDaily')}
+              value={minDaily > 0 ? money(minDaily) : t('notSet')}
+              valueColor={minDaily > 0 ? p.positive : p.warn}
+              onPress={() => {
+                setFloorDraft(minDaily > 0 ? String(minDaily) : '');
+                setFloorSheet(true);
+              }}
+            />
+            {minDaily > 0 && (
+              <Row label={t('floorMonthly')} value={money(spend.floorMonthly)} />
+            )}
+            {spend.goalHeldBack > 0 && (
+              <Row
+                label={t('heldBackByFloor')}
+                value={money(spend.goalHeldBack)}
+                valueColor={p.warn}
+              />
+            )}
+          </View>
+          {spend.goalHeldBack > 0 && (
+            <Caption style={{ marginTop: SPACE.sm, color: p.warn }}>{t('heldBackNote')}</Caption>
+          )}
+        </Card>
+
+        {/* ---- mode ---- */}
+        <Card>
+          <Title>{t('goalModeT')}</Title>
+          <Caption>{t('goalModeNote')}</Caption>
+          <Chips
+            value={mode}
+            onChange={(m) => setGoalMode(goal.id, m)}
+            options={[
+              { id: 'horizon', label: t('modeHorizon') },
+              { id: 'stretch', label: t('modeStretch') },
+              { id: 'fixed', label: t('modeFixed') },
+            ]}
+          />
+          <Caption>
+            {mode === 'horizon'
+              ? t('modeHorizonHelp')
+              : mode === 'stretch'
+                ? t('modeStretchHelp')
+                : t('modeFixedHelp')}
+          </Caption>
+        </Card>
+
+        {/* ---- FIX THE DATE: what will I actually have ---- */}
+        {mode === 'horizon' && (
+          <Card>
+            <Title>{t('landingT')}</Title>
+            <Caption>{t('landingNote')}</Caption>
+
+            <Chips
+              value={horizon}
+              onChange={(h) => setHorizon(h)}
+              options={HORIZONS.map((h) => ({ id: h, label: `${h} ${t('monthsW')}` }))}
+            />
+
+            <Text style={[styles.hero, { color: track.reachesAspiration ? p.positive : p.accent, textAlign: rtl ? 'right' : 'left' }]}>
+              {fmt(track.projected)}
+            </Text>
+            <Caption>
+              {t('byDate')} {MONTHS[lang][track.targetDate.getMonth()]} {track.targetDate.getFullYear()}
+            </Caption>
+
+            <View style={{ marginTop: SPACE.md }}>
+              <Meter ratio={track.progress} color={track.reachesAspiration ? p.positive : p.accent} />
+              <Row
+                label={t('percentOfGoal')}
+                value={`${num(Math.round(track.progress * 100))}%`}
+                valueColor={track.reachesAspiration ? p.positive : p.warn}
+              />
+              {!track.reachesAspiration && (
+                <Row label={t('gapVsAspiration')} value={fmt(track.gap)} valueColor={p.negative} />
+              )}
+              <Row label={t('ifSpendFloor')} value={fmt(track.projectedAtFloor)} />
+              <Row label={t('ifSpendNothing')} value={fmt(track.projectedIfNoSpend)} valueColor={p.positive} />
+            </View>
+
+            {/* The lever that makes the number feel controllable. */}
+            <View style={{ marginTop: SPACE.md }}>
+              <Caption>{t('leverT')}</Caption>
+              {[5, 10, 20].map((cut) => (
+                <Row
+                  key={cut}
+                  label={`${t('spendLess')} ${money(cut)} / ${t('dayW')}`}
+                  value={`+ ${fmt(track.perDirhamPerDay * cut)}`}
+                  valueColor={p.positive}
+                />
+              ))}
+            </View>
+
+            <Caption style={{ marginTop: SPACE.md }}>{t('updatesDaily')}</Caption>
+          </Card>
+        )}
 
         {/* ---- the verdict ---- */}
         <Card>
@@ -220,6 +345,7 @@ export default function GoalPlanScreen() {
         </Card>
 
         {/* ---- what would it take ---- */}
+        {mode !== 'horizon' && (
         <Card>
           <Title>
             {t('toFinishIn')} {num(horizon)} {t('monthsW')}
@@ -260,6 +386,7 @@ export default function GoalPlanScreen() {
             </View>
           )}
         </Card>
+        )}
 
         {/* ---- pick a plan ---- */}
         {scenarios.length > 0 && (
@@ -326,6 +453,24 @@ export default function GoalPlanScreen() {
           )}
         </Card>
       </ScrollView>
+
+      <Sheet
+        visible={floorSheet}
+        title={t('livingFloorT')}
+        onClose={() => setFloorSheet(false)}
+        onSubmit={() => {
+          setMinDailySpend(parseAmount(floorDraft));
+          setFloorSheet(false);
+        }}
+        submitLabel={t('save')}
+      >
+        <Caption>{t('floorSheetNote')}</Caption>
+        <View style={{ height: SPACE.md }} />
+        <TextField label={t('minDaily')} value={floorDraft} onChange={setFloorDraft} numeric big />
+        <Caption>
+          {t('currentDaily')}: {money(capacity.projectedSpend / capacity.daysInMonth)}
+        </Caption>
+      </Sheet>
 
       <Sheet
         visible={editing}

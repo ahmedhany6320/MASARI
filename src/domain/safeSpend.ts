@@ -22,8 +22,14 @@ export interface SafeSpend {
   cardDue: number;
   /** Planned international transfers. */
   planT: number;
-  /** Monthly goal contribution required. */
+  /** Monthly goal contribution actually reserved, after protecting the floor. */
   goalReq: number;
+  /** What the goal schedule asked for before the floor capped it. */
+  goalAsked: number;
+  /** How much the living floor held back from the goal. */
+  goalHeldBack: number;
+  /** The declared living floor, per month. Zero when none is set. */
+  floorMonthly: number;
   /** Salary left for living after every fixed claim. */
   livingPool: number;
   /** Spent this cycle. */
@@ -111,7 +117,22 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const cardDue = cc.stmtRem + cc.instMo;
 
   const planT = s.planTf.reduce((a, p) => a + p.amt, 0);
-  const goalReq = goalsMonthlyRequirement(s.goals, fx);
+
+  /*
+   * Goals may only claim what is left once the living floor is safe.
+   *
+   * Without this cap an ambitious target quietly drives the daily limit toward
+   * zero, which is arithmetically correct and practically useless — nobody
+   * lives on it, so they stop trusting the number entirely. Capping means the
+   * GOAL slips rather than the person going hungry, and the goal screen shows
+   * exactly how far it slipped and why.
+   */
+  const daysInMonth = new Date(Y, M + 1, 0).getDate();
+  const floorMonthly = Math.max(0, s.minDailySpend ?? 0) * daysInMonth;
+  const poolBeforeGoal = s.base - commitObl - planT - cardDue;
+  const goalAsked = goalsMonthlyRequirement(s.goals, fx);
+  const goalReq = Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
+  const goalHeldBack = Math.max(0, goalAsked - goalReq);
 
   /*
    * A baseline set during THIS cycle means the user declared their real
@@ -157,6 +178,9 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     cardDue,
     planT,
     goalReq,
+    goalAsked,
+    goalHeldBack,
+    floorMonthly,
     livingPool,
     cycleSpend,
     spendable,

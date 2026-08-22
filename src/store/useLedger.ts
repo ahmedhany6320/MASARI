@@ -116,6 +116,10 @@ export interface LedgerStore {
     spentThisCycle: number;
   }) => void;
   setSavingsTarget: (target: number | null) => void;
+  /** The least the user can live on per day — goals may never breach it. */
+  setMinDailySpend: (amount: number | null) => void;
+  /** How a goal is pursued: fixed amount+date, stretch the date, or fix the date. */
+  setGoalMode: (goalId: string, mode: 'fixed' | 'stretch' | 'horizon') => void;
 
   addCategory: (ar: string, en: string) => void;
   removeCategory: (id: string) => void;
@@ -324,6 +328,19 @@ export const useLedger = create<LedgerStore>()(
           ledger: { ...s.ledger, salStatus, salActual: salActual ?? s.ledger.salActual },
         })),
       setSavingsTarget: (savTarget) => set((s) => ({ ledger: { ...s.ledger, savTarget } })),
+
+      setMinDailySpend: (minDailySpend) =>
+        set((s) => ({
+          ledger: {
+            ...s.ledger,
+            minDailySpend: minDailySpend != null && minDailySpend > 0 ? minDailySpend : null,
+          },
+        })),
+
+      setGoalMode: (goalId, mode) =>
+        set((s) => ({
+          ledger: { ...s.ledger, goalMode: { ...(s.ledger.goalMode ?? {}), [goalId]: mode } },
+        })),
 
       startFromToday: (snap) =>
         set((s) => ({

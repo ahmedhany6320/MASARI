@@ -249,4 +249,20 @@ export interface Ledger {
 
   /** Set when the user started fresh from a declared position. */
   baseline?: Baseline | null;
+
+  /**
+   * The least the user can genuinely live on per day.
+   *
+   * Treated as inviolable: goals may only reserve what is left above it. This
+   * is what stops the arithmetic demanding an impossible lifestyle to hit a
+   * date — the goal slips instead, which is the honest trade.
+   */
+  minDailySpend?: number | null;
+
+  /**
+   * How each goal is pursued. See `GoalMode` in `adaptive.ts`:
+   * `fixed` holds amount and date, `stretch` holds the amount and lets the
+   * date move, `horizon` holds the date and lets the amount move.
+   */
+  goalMode?: Record<string, 'fixed' | 'stretch' | 'horizon'>;
 }

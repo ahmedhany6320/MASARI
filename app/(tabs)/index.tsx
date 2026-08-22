@@ -87,7 +87,16 @@ export default function HomeScreen() {
                 valueColor={c.cardDue > 0 ? p.negative : p.sub}
                 onPress={() => router.push('/card')}
               />
-              <Row label={t('goals')} value={`− ${money(c.goalReq)}`} />
+              <Row
+                label={t('goals')}
+                value={`− ${money(c.goalReq)}`}
+                onPress={() => router.push('/goal-plan')}
+              />
+              {c.goalHeldBack > 0 && (
+                <Caption style={{ color: p.warn, marginTop: SPACE.xs }}>
+                  {t('heldBackByFloor')} {money(c.goalHeldBack)} — {t('floorProtected')}
+                </Caption>
+              )}
               <Row label={t('livingPool')} value={money(c.livingPool)} valueColor={p.ink} />
               <Row label={t('monthSpend')} value={`− ${money(c.cycleSpend)}`} />
               <Row
