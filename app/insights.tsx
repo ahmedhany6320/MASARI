@@ -83,6 +83,9 @@ export default function InsightsScreen() {
           <Card>
             <Title>{t('goalETA')}</Title>
             <Caption>{t('goalETANote')}</Caption>
+            <View style={{ marginTop: SPACE.sm }}>
+              <Button label={t('goalPlanT')} onPress={() => router.push('/goal-plan')} />
+            </View>
             {ledger.goals
               .filter((g) => g.target)
               .map((g) => {
@@ -120,7 +123,7 @@ export default function InsightsScreen() {
                           <Button
                             label={t('setDeadline')}
                             variant="secondary"
-                            onPress={() => router.push('/(tabs)/plan')}
+                            onPress={() => router.push(`/goal-plan?id=${g.id}`)}
                           />
                         </View>
                       </View>

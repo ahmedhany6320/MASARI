@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  burnRate,
   cardPosition,
   formatAmount,
   formatMoney,
@@ -9,6 +10,7 @@ import {
   type SafeSpend,
   type SavingSummary,
 } from '../domain';
+import type { Capacity } from '../domain';
 import { STRINGS, isRtl, type StringKey } from '../i18n';
 import { paletteFor, type Palette } from '../theme/tokens';
 import { useLedger } from './useLedger';
@@ -63,4 +65,36 @@ export function useLocalization(): Localization {
 export function usePalette(): Palette {
   const theme = useLedger((s) => s.settings.theme);
   return useMemo(() => paletteFor(theme), [theme]);
+}
+
+
+/**
+ * Monthly saving capacity — the figure every goal projection is built on.
+ *
+ * Uses PROJECTED month spending rather than month-to-date. Before payday the
+ * to-date figure reads as near-zero and would make every projection
+ * absurdly optimistic; projecting the whole month at the observed pace is the
+ * honest basis for a plan.
+ */
+export function useCapacity(): Capacity {
+  const ledger = useLedger((s) => s.ledger);
+  const fxRate = useLedger((s) => s.settings.fxRate);
+
+  return useMemo(() => {
+    const now = new Date();
+    const c = safeSpend(ledger, fxRate, now);
+    const burn = burnRate(ledger, c.livingPool, now);
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    // The pool BEFORE any goal reservation: reserving for the goal and then
+    // asking what is left for the goal would be circular.
+    const poolBeforeGoal = ledger.base - c.commitObl - c.planT - c.cardDue;
+
+    return {
+      poolBeforeGoal,
+      projectedSpend: burn.projectedMonth,
+      saving: poolBeforeGoal - burn.projectedMonth,
+      daysInMonth,
+    };
+  }, [ledger, fxRate]);
 }

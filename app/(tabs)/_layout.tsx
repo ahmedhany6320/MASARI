@@ -1,5 +1,8 @@
 import { Tabs } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, Text, View, type ColorValue } from 'react-native';
+import { Fab } from '../../src/components/Fab';
+import { QuickAdd } from '../../src/components/QuickAdd';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalization, usePalette } from '../../src/store/selectors';
 import { FONT, SPACE } from '../../src/theme/tokens';
@@ -46,9 +49,11 @@ export default function TabsLayout() {
   ];
 
   const ordered = rtl ? [...screens].reverse() : screens;
+  const [adding, setAdding] = useState(false);
 
   return (
-    <Tabs
+    <>
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: p.accent,
@@ -67,17 +72,22 @@ export default function TabsLayout() {
         },
       }}
     >
-      {ordered.map((s) => (
-        <Tabs.Screen
-          key={s.name}
-          name={s.name}
-          options={{
-            title: s.title,
-            tabBarIcon: ({ color }) => <TabIcon glyph={s.glyph} color={color} />,
-          }}
-        />
-      ))}
-    </Tabs>
+        {ordered.map((s) => (
+          <Tabs.Screen
+            key={s.name}
+            name={s.name}
+            options={{
+              title: s.title,
+              tabBarIcon: ({ color }) => <TabIcon glyph={s.glyph} color={color} />,
+            }}
+          />
+        ))}
+      </Tabs>
+
+      {/* Mounted outside the navigator so one button serves every tab. */}
+      <Fab onPress={() => setAdding(true)} />
+      <QuickAdd visible={adding} onClose={() => setAdding(false)} />
+    </>
   );
 }
 

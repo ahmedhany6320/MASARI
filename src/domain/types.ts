@@ -190,6 +190,25 @@ export type SalaryStatus = 'expected' | 'received';
  * (open sheets, drafts, toasts) is deliberately kept out, so a sync never
  * ships transient interface state to the server.
  */
+/**
+ * A "start from today" anchor.
+ *
+ * Set when the user declares their real balances now instead of back-filling
+ * history. Everything before `ts` is treated as already reflected in the
+ * opening balances, so the app computes forward from this moment rather than
+ * demanding weeks of retroactive data entry.
+ */
+export interface Baseline {
+  /** When the baseline was taken. */
+  ts: number;
+  /**
+   * How much of THIS cycle's living pool was already spent before the anchor.
+   * Without this the app would hand back a full month's allowance on day 16
+   * and quietly double the budget.
+   */
+  cycleSpentBefore: number;
+}
+
 export interface Ledger {
   /** Reconciled bank balance at the opening date. */
   bankOpen: number;
@@ -227,4 +246,7 @@ export interface Ledger {
   rules: Record<string, string>;
 
   savTarget: number | null;
+
+  /** Set when the user started fresh from a declared position. */
+  baseline?: Baseline | null;
 }

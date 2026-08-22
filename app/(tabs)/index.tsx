@@ -81,6 +81,12 @@ export default function HomeScreen() {
               <Row label={t('salaryWork')} value={money(ledger.base)} />
               <Row label={t('upcoming')} value={`− ${money(c.commitObl)}`} />
               <Row label={t('plannedTransfers')} value={`− ${money(c.planT)}`} />
+              <Row
+                label={t('cardDueLabel')}
+                value={`− ${money(c.cardDue)}`}
+                valueColor={c.cardDue > 0 ? p.negative : p.sub}
+                onPress={() => router.push('/card')}
+              />
               <Row label={t('goals')} value={`− ${money(c.goalReq)}`} />
               <Row label={t('livingPool')} value={money(c.livingPool)} valueColor={p.ink} />
               <Row label={t('monthSpend')} value={`− ${money(c.cycleSpend)}`} />
@@ -90,7 +96,8 @@ export default function HomeScreen() {
                 valueColor={c.spendable > 0 ? p.positive : p.negative}
               />
               <Row label={t('daysLeftLabel')} value={`÷ ${num(c.daysLeft)}`} />
-              <Caption style={{ marginTop: SPACE.md }}>{t('sslNote')}</Caption>
+              <Caption style={{ marginTop: SPACE.md }}>{t('cardDueNote')}</Caption>
+              <Caption style={{ marginTop: SPACE.sm }}>{t('sslNote')}</Caption>
             </View>
           )}
         </Card>
@@ -122,9 +129,10 @@ export default function HomeScreen() {
           </Body>
         </Card>
 
-        {/* Recording a spend is by far the most frequent action, so it gets a
-            full-width primary target rather than a row in a menu. */}
-        <QuickAction icon="＋" label={t('addExpense')} primary onPress={() => setAdding(true)} />
+        {/* Adding a spend lives in the floating button, which is reachable from
+            every screen and never scrolls away — so this row is for the two
+            things worth a deliberate trip. */}
+        <QuickAction icon="🎯" label={t('goalPlanT')} primary onPress={() => router.push('/goal-plan')} />
         <View style={{ height: SPACE.sm }} />
         <QuickAction icon="📊" label={t('insights')} onPress={() => router.push('/insights')} />
       </ScrollView>

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -378,8 +379,9 @@ export default function PlanScreen() {
               </View>
             )}
 
-            <View style={{ marginTop: SPACE.lg }}>
-              <Button label={t('addGoal')} onPress={() => openSheet({ kind: 'goal' })} />
+            <View style={{ marginTop: SPACE.lg, gap: SPACE.sm }}>
+              <Button label={t('goalPlanT')} onPress={() => router.push('/goal-plan')} />
+              <Button label={t('addGoal')} variant="secondary" onPress={() => openSheet({ kind: 'goal' })} />
             </View>
           </Card>
         )}

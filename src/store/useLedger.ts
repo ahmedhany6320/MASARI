@@ -102,6 +102,19 @@ export interface LedgerStore {
   payCard: (amt: number, acct: Account) => void;
 
   setSalaryStatus: (status: SalaryStatus, actual?: number | null) => void;
+  /**
+   * Declares the real position right now and starts counting from here,
+   * instead of demanding weeks of back-filled history.
+   */
+  startFromToday: (snapshot: {
+    bank: number;
+    cash: number | null;
+    cardStatement: number;
+    cardUnbilled: number;
+    instBal: number;
+    instMo: number;
+    spentThisCycle: number;
+  }) => void;
   setSavingsTarget: (target: number | null) => void;
 
   addCategory: (ar: string, en: string) => void;
@@ -311,6 +324,27 @@ export const useLedger = create<LedgerStore>()(
           ledger: { ...s.ledger, salStatus, salActual: salActual ?? s.ledger.salActual },
         })),
       setSavingsTarget: (savTarget) => set((s) => ({ ledger: { ...s.ledger, savTarget } })),
+
+      startFromToday: (snap) =>
+        set((s) => ({
+          ledger: {
+            ...s.ledger,
+            bankOpen: snap.bank,
+            cashOpen: snap.cash,
+            cardSetup: {
+              stmt0: snap.cardStatement,
+              unbilled0: snap.cardUnbilled,
+              instBal: snap.instBal,
+              instMo: snap.instMo,
+            },
+            cardAdj: 0,
+            // History is kept for analytics but stops moving balances: the
+            // figures above already include everything that came before.
+            tx: s.ledger.tx.map((x) => ({ ...x, post: false })),
+            baseline: { ts: Date.now(), cycleSpentBefore: snap.spentThisCycle },
+            lastRecStr: new Date().toISOString().slice(0, 10),
+          },
+        })),
 
       // ---- categories -----------------------------------------------------
       addCategory: (ar, en) =>

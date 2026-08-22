@@ -193,17 +193,38 @@ describe('safeSpend — balances and the card', () => {
     expect(c.liquid).toBe(20000);
   });
 
-  it('reports card obligations without deducting them from the daily limit', () => {
-    // Deliberate: card spending already reduced the limit as an expense when it
-    // happened. Subtracting the resulting statement again would double-count it.
+  it('deducts what the card takes this month, but not this cycle spending twice', () => {
     const s = ledger({
       cardSetup: { stmt0: 4000, unbilled0: 0, instBal: 6000, instMo: 500 },
       cardCfg: { limit: 20000, closeDay: 1, dueDay: 25 },
     });
     const c = safeSpend(s, FX, NOW);
+
+    // Statement (spent LAST cycle, payable now) plus this month's installment
+    // are real claims on this salary and must come out of the pool.
+    expect(c.cardDue).toBe(4500);
+    expect(c.livingPool).toBe(11000 - 4500);
+
+    // The wider outstanding figure stays available for display.
     expect(c.cardObl).toBe(4500);
+  });
+
+  it('does not deduct unbilled card spending, which is already an expense', () => {
+    const spentToday = spend(300, DAY_START + 3600e3, { acct: 'card' });
+    const s = ledger({
+      cardSetup: { stmt0: 0, unbilled0: 0, instBal: 0, instMo: 0 },
+      cardCfg: { limit: 20000, closeDay: 1, dueDay: 25 },
+      tx: [spentToday],
+    });
+    const c = safeSpend(s, FX, NOW);
+
+    // The 300 shows up as unbilled on the card AND as this cycle's spending.
+    expect(c.cc.unbilled).toBe(300);
+    expect(c.cycleSpend).toBe(300);
+    // It must be charged once, via cycleSpend — never again via the pool.
+    expect(c.cardDue).toBe(0);
     expect(c.livingPool).toBe(11000);
-    expect(c.ssl).toBe(500);
+    expect(c.spendable).toBe(10700);
   });
 
   it('sums money already earmarked for goals', () => {

@@ -109,8 +109,14 @@ export default function MoreScreen() {
             value={c.goalReq > 0 ? money(c.goalReq) : '—'}
             valueColor={c.goalReq > 0 ? p.accentDeep : p.sub}
             hint={goalNeedsDeadline ? t('noDeadlineShort') : undefined}
-            onPress={() => router.push('/(tabs)/plan')}
+            onPress={() => router.push('/goal-plan')}
             badge={goalNeedsDeadline}
+          />
+          <Tile
+            icon="🔄"
+            label={t('startTodayT')}
+            hint={t('startTodayTileHint')}
+            onPress={() => router.push('/start-today')}
           />
         </TileGrid>
 

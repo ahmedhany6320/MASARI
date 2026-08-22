@@ -16,4 +16,5 @@ export * from './safeSpend';
 export * from './notify';
 export * from './importBackup';
 export * from './insights';
+export * from './goalPlan';
 export * from './defaults';

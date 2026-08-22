@@ -14,6 +14,12 @@ export interface SafeSpend {
   commitObl: number;
   /** Everything the card will demand: statement + unbilled + this month's installment. */
   cardObl: number;
+  /**
+   * What the card actually takes OUT of this month's salary: the statement
+   * issued for last cycle plus this month's installment. This is deducted from
+   * the living pool; `cardObl` is the wider display figure.
+   */
+  cardDue: number;
   /** Planned international transfers. */
   planT: number;
   /** Monthly goal contribution required. */
@@ -35,6 +41,8 @@ export interface SafeSpend {
   /** What tomorrow looks like if today stops here. */
   tomorrow: number;
   daysLeft: number;
+  /** Days already elapsed in the cycle. */
+  daysElapsed: number;
   nextPay: Date;
   dayStart: number;
   cc: CardPosition;
@@ -50,7 +58,8 @@ export interface SafeSpend {
  * Sizing the daily limit off the balance would therefore invite the user to
  * spend money that is already spoken for.
  *
- *     livingPool = salary − commitments − planned transfers − goal contribution
+ *     livingPool = salary − commitments − planned transfers
+ *                         − goal contribution − card due this month
  *     spendable  = livingPool − spent so far this cycle
  *     allowance  = (spendable + spentToday) / daysToPayday
  *     ssl        = allowance − spentToday
@@ -84,24 +93,51 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     .reduce((a, c) => a + (c.amt ?? 0), 0);
 
   const cc = cardPosition(s);
-  // Card purchases raise the card outstanding AND are reserved against the
-  // bank balance, because the statement is eventually settled from that same
-  // balance. Reserved, not deducted twice — the ledger balance only moves on
-  // the actual payment.
   const cardObl = cc.stmtRem + cc.unbilled + cc.instMo;
+
+  /*
+   * What the card genuinely claims from THIS month's salary.
+   *
+   *  - `stmtRem` is last cycle's statement, issued and payable now. That
+   *    spending happened in a PREVIOUS cycle, so it is nowhere in this
+   *    cycle's `cycleSpend` — leaving it out made it invisible, and the app
+   *    handed back money that was already committed to the bank.
+   *  - `instMo` is this month's installment charge: a real, dated outflow.
+   *
+   * `unbilled` is deliberately NOT deducted. That is this cycle's card
+   * spending, already counted as expenses in `cycleSpend`; subtracting it
+   * here as well would charge the same dirhams to the user twice.
+   */
+  const cardDue = cc.stmtRem + cc.instMo;
 
   const planT = s.planTf.reduce((a, p) => a + p.amt, 0);
   const goalReq = goalsMonthlyRequirement(s.goals, fx);
 
-  const cycleSpend = s.tx
-    .filter((x) => x.type === 'expense' && x.ts >= monthStart)
-    .reduce((a, x) => a + x.amt, 0);
+  /*
+   * A baseline set during THIS cycle means the user declared their real
+   * position part-way through the month: spending before that moment is
+   * already reflected in the balances they stated, so it is taken from
+   * `cycleSpentBefore` rather than re-summed from the ledger. Counting both
+   * would charge that spending twice; counting neither would hand back a full
+   * month's allowance on day 16.
+   */
+  const baseTs = s.baseline && s.baseline.ts >= monthStart ? s.baseline.ts : null;
+  const spentBefore = baseTs != null ? (s.baseline?.cycleSpentBefore ?? 0) : 0;
+  const countFrom = baseTs != null ? Math.max(monthStart, baseTs) : monthStart;
 
-  const livingPool = s.base - commitObl - planT - goalReq;
+  const cycleSpend =
+    spentBefore +
+    s.tx
+      .filter((x) => x.type === 'expense' && x.ts >= countFrom)
+      .reduce((a, x) => a + x.amt, 0);
+
+  const livingPool = s.base - commitObl - planT - goalReq - cardDue;
   const spendable = livingPool - cycleSpend;
 
+  // Today's spending is likewise counted only from the baseline forward.
+  const todayFrom = baseTs != null ? Math.max(dayStart, baseTs) : dayStart;
   const flexToday = s.tx
-    .filter((x) => x.type === 'expense' && x.ts >= dayStart)
+    .filter((x) => x.type === 'expense' && x.ts >= todayFrom)
     .reduce((a, x) => a + x.amt, 0);
 
   // An overspent cycle yields no allowance at all rather than a negative one:
@@ -118,6 +154,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     protectedAlloc,
     commitObl,
     cardObl,
+    cardDue,
     planT,
     goalReq,
     livingPool,
@@ -129,6 +166,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     overToday,
     tomorrow,
     daysLeft,
+    daysElapsed: dom,
     nextPay,
     dayStart,
     cc,
