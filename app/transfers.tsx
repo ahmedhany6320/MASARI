@@ -4,7 +4,14 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, DayPicker, Sheet, TextField } from '../src/components/fields';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../src/components/ui';
-import { formatEgp, isEgpGoal, parseAmount } from '../src/domain';
+import {
+  annualFeeCost,
+  formatEgp,
+  isEgpGoal,
+  parseAmount,
+  transferStats,
+  transferSummary,
+} from '../src/domain';
 import { formatShortDate } from '../src/i18n';
 import { useLocalization, usePalette, useSafeSpend } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
@@ -41,6 +48,23 @@ export default function TransfersScreen() {
   const [goalId, setGoalId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [rateDraft, setRateDraft] = useState('');
+  const [fee, setFee] = useState('');
+  const [to, setTo] = useState('');
+  const [sentRate, setSentRate] = useState('');
+
+  // 90 days is long enough for fee and rate patterns to mean something, and
+  // short enough to still describe current behaviour.
+  const WINDOW_DAYS = 90;
+  const since = useMemo(() => Date.now() - WINDOW_DAYS * 864e5, []);
+  const stats = useMemo(() => transferStats(ledger, since, fxRate), [ledger, since, fxRate]);
+  const summary = useMemo(() => transferSummary(ledger, since, fxRate), [ledger, since, fxRate]);
+  const yearlyFees = annualFeeCost(summary, WINDOW_DAYS);
+
+  // Recipients already used, so a repeat transfer is one tap rather than typing.
+  const knownRecipients = useMemo(
+    () => Array.from(new Set(stats.map((x) => x.to).filter((x) => x !== '—'))),
+    [stats],
+  );
 
   const sent = useMemo(
     () => ledger.tx.filter((x) => x.type === 'remit').slice(0, 30),
@@ -67,17 +91,25 @@ export default function TransfersScreen() {
   function doSend() {
     if (amountVal == null || amountVal <= 0) return;
     const goal = goalId && goalId !== '__none__' ? ledger.goals.find((g) => g.id === goalId) : null;
+    // The rate actually used, which may differ from today's stored rate.
+    const usedRate = parseAmount(sentRate) ?? fxRate;
     sendTransfer({
       amt: amountVal,
+      fee: parseAmount(fee) ?? 0,
+      rate: usedRate,
+      to: to.trim() || undefined,
       purpose: goal ? 'goal' : 'other',
       memo: note.trim() || undefined,
       goalId: goal?.id,
-      // An EGP-denominated goal is credited in pounds, so the converted amount
-      // has to travel with the transfer.
-      egp: goal && isEgpGoal(goal) ? amountVal * fxRate : undefined,
+      // An EGP-denominated goal is credited in pounds, at the rate this
+      // transfer actually achieved — not at today's.
+      egp: goal && isEgpGoal(goal) ? amountVal * usedRate : undefined,
     });
     setAmount('');
     setNote('');
+    setFee('');
+    setTo('');
+    setSentRate('');
     setGoalId(null);
     setSheet(null);
   }
@@ -141,6 +173,55 @@ export default function TransfersScreen() {
           </View>
         </Card>
 
+        {summary.count > 0 && (
+          <Card>
+            <Title>{t('transferReport')}</Title>
+            <Caption>{t('transferReportNote')}</Caption>
+            <View style={{ marginTop: SPACE.sm }}>
+              <Row label={t('transferCount')} value={num(summary.count)} />
+              <Row label={t('totalSent')} value={money(summary.sent)} />
+              <Row label={t('totalDelivered')} value={formatEgp(summary.delivered, lang)} valueColor={p.positive} />
+              <Row
+                label={t('totalFees')}
+                value={`${money(summary.fees)} · ${num(Math.round(summary.feeRate * 1000) / 10)}%`}
+                valueColor={summary.fees > 0 ? p.negative : p.sub}
+              />
+              {yearlyFees > 0 && (
+                <Row label={t('yearlyFees')} value={money(yearlyFees)} valueColor={p.warn} />
+              )}
+              {summary.bestRate != null && summary.worstRate != null && (
+                <Row
+                  label={t('rateRange')}
+                  value={`${num(summary.worstRate)} – ${num(summary.bestRate)}`}
+                />
+              )}
+              {summary.lostToTiming > 0 && (
+                <>
+                  <Row
+                    label={t('lostToTiming')}
+                    value={formatEgp(summary.lostToTiming, lang)}
+                    valueColor={p.negative}
+                  />
+                  <Caption style={{ marginTop: SPACE.xs }}>{t('lostToTimingNote')}</Caption>
+                </>
+              )}
+            </View>
+
+            {stats.length > 1 && (
+              <View style={{ marginTop: SPACE.lg }}>
+                <Caption>{t('byRecipient')}</Caption>
+                {stats.map((x) => (
+                  <Row
+                    key={x.to}
+                    label={`${x.to} · ${num(x.count)}×`}
+                    value={`${money(x.sent)} → ${formatEgp(x.delivered, lang)}`}
+                  />
+                ))}
+              </View>
+            )}
+          </Card>
+        )}
+
         <Card>
           <Title>{t('sentTransfers')}</Title>
           {sent.length === 0 ? (
@@ -148,14 +229,21 @@ export default function TransfersScreen() {
           ) : (
             <View style={{ marginTop: SPACE.sm }}>
               {sent.map((x) => (
-                <Row
-                  key={x.id}
-                  label={`${formatShortDate(new Date(x.ts), lang)}${
-                    x.purpose === 'goal' ? ` · ${t('goals')}` : ''
-                  }`}
-                  value={money(x.amt)}
-                  valueColor={p.negative}
-                />
+                <View key={x.id}>
+                  <Row
+                    label={`${formatShortDate(new Date(x.ts), lang)}${x.to ? ` · ${x.to}` : ''}${
+                      x.purpose === 'goal' ? ` · ${t('goals')}` : ''
+                    }`}
+                    value={money(x.amt)}
+                    valueColor={p.negative}
+                  />
+                  {(x.fee || x.rate) && (
+                    <Caption>
+                      {x.rate ? `${t('rateUsed')} ${num(x.rate)}` : ''}
+                      {x.fee ? ` · ${t('totalFees')} ${money(x.fee)}` : ''}
+                    </Caption>
+                  )}
+                </View>
               ))}
             </View>
           )}
@@ -200,6 +288,23 @@ export default function TransfersScreen() {
             options={goalOptions}
           />
         )}
+        <TextField label={t('recipient')} value={to} onChange={setTo} />
+        {knownRecipients.length > 0 && (
+          <Chips
+            value={to}
+            onChange={(v) => setTo(v)}
+            options={knownRecipients.map((r) => ({ id: r, label: r }))}
+          />
+        )}
+        <TextField label={t('transferFee')} hint={t('transferFeeHint')} value={fee} onChange={setFee} numeric />
+        <TextField
+          label={t('rateUsed')}
+          hint={t('rateUsedHint')}
+          value={sentRate}
+          onChange={setSentRate}
+          numeric
+          placeholder={String(fxRate)}
+        />
         <TextField label={t('note')} value={note} onChange={setNote} />
       </Sheet>
 

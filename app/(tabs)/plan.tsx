@@ -5,13 +5,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, DayPicker, Sheet, TextField } from '../../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import {
+  debtSummary,
   formatEgp,
   goalMonthlyRequirement,
   isEgpGoal,
   parseAmount,
+  personHistory,
+  repaidRatio,
   type Account,
   type DebtDirection,
 } from '../../src/domain';
+import { formatShortDate } from '../../src/i18n';
 import { useLocalization, usePalette, useSafeSpend } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
 import { FONT, RADIUS, SPACE } from '../../src/theme/tokens';
@@ -65,6 +69,11 @@ export default function PlanScreen() {
   const [dir, setDir] = useState<DebtDirection>('owe');
   const [currency, setCurrency] = useState<'AED' | 'EGP'>('AED');
   const [acct, setAcct] = useState<Account>('bank');
+  // Which person's history is expanded. Collapsed by default so the list
+  // stays scannable.
+  const [openPerson, setOpenPerson] = useState<string | null>(null);
+
+  const debts = useMemo(() => debtSummary(ledger), [ledger]);
 
   function openSheet(next: NonNullable<typeof sheet>) {
     // Prefill from the record being edited, so an edit sheet never starts blank
@@ -302,29 +311,78 @@ export default function PlanScreen() {
               <Body muted style={{ marginTop: SPACE.lg }}>{t('peopleEmpty')}</Body>
             ) : (
               <View style={{ marginTop: SPACE.sm }}>
-                {ledger.people.map((person) => (
-                  <View key={person.id} style={{ marginBottom: SPACE.md }}>
-                    <Row
-                      label={`${person.name} · ${person.dir === 'owe' ? t('iOwe') : t('owedToMe')}`}
-                      value={money(person.out)}
-                      valueColor={person.dir === 'owe' ? p.negative : p.positive}
-                    />
-                    <View style={[styles.actions, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
-                      {person.out > 0 && (
-                        <Button
-                          label={person.dir === 'owe' ? t('payNow') : t('markReceived')}
-                          variant="secondary"
-                          onPress={() => openSheet({ kind: 'settle', id: person.id })}
-                        />
-                      )}
-                      <Button
-                        label={t('del')}
-                        variant="secondary"
-                        onPress={() => confirmDelete(person.name, () => removePerson(person.id))}
+                {/* Net position first: the single question people actually
+                    open this section to answer. */}
+                <Row label={t('owedToMe')} value={money(debts.owedToMe)} valueColor={p.positive} />
+                <Row label={t('iOwe')} value={money(debts.owed)} valueColor={p.negative} />
+                <Row
+                  label={t('netPosition')}
+                  value={money(Math.abs(debts.net))}
+                  valueColor={debts.net >= 0 ? p.positive : p.negative}
+                />
+                <Caption style={{ marginTop: SPACE.xs }}>
+                  {debts.net >= 0 ? t('netLender') : t('netBorrower')}
+                </Caption>
+
+                <View style={{ height: SPACE.lg }} />
+
+                {ledger.people.map((person) => {
+                  const history = personHistory(ledger, person);
+                  const repaid = repaidRatio(person);
+                  const expanded = openPerson === person.id;
+                  return (
+                    <View key={person.id} style={{ marginBottom: SPACE.md }}>
+                      <Row
+                        label={`${person.name} · ${person.dir === 'owe' ? t('iOwe') : t('owedToMe')}`}
+                        value={person.out > 0 ? money(person.out) : t('settled')}
+                        valueColor={
+                          person.out === 0 ? p.positive : person.dir === 'owe' ? p.negative : p.ink
+                        }
+                        onPress={() => setOpenPerson(expanded ? null : person.id)}
                       />
+                      {person.amt > 0 && (
+                        <>
+                          <Meter ratio={repaid} color={repaid >= 1 ? p.positive : p.accent} />
+                          <Caption>
+                            {t('repaidOf')} {money(person.amt - person.out)} / {money(person.amt)}
+                          </Caption>
+                        </>
+                      )}
+
+                      {expanded && (
+                        <View style={{ marginTop: SPACE.sm }}>
+                          {history.length === 0 ? (
+                            <Caption>{t('noPersonHistory')}</Caption>
+                          ) : (
+                            history.map((e) => (
+                              <Row
+                                key={e.tx.id}
+                                label={formatShortDate(new Date(e.tx.ts), lang)}
+                                value={`${e.direction === 'decrease' ? '−' : '+'} ${money(e.tx.amt)} → ${money(e.runningOut)}`}
+                                valueColor={e.direction === 'decrease' ? p.positive : p.negative}
+                              />
+                            ))
+                          )}
+                        </View>
+                      )}
+
+                      <View style={[styles.actions, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
+                        {person.out > 0 && (
+                          <Button
+                            label={person.dir === 'owe' ? t('payNow') : t('markReceived')}
+                            variant="secondary"
+                            onPress={() => openSheet({ kind: 'settle', id: person.id })}
+                          />
+                        )}
+                        <Button
+                          label={t('del')}
+                          variant="secondary"
+                          onPress={() => confirmDelete(person.name, () => removePerson(person.id))}
+                        />
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 

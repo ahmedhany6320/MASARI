@@ -263,6 +263,9 @@ export function importBackup(raw: unknown): ImportResult {
         post: x.post === false ? false : true,
         personId: typeof x.personId === 'string' ? x.personId : undefined,
         purpose: typeof x.purpose === 'string' ? x.purpose : undefined,
+        fee: num(x.fee) ?? undefined,
+        rate: num(x.rate) ?? undefined,
+        to: typeof x.to === 'string' ? x.to : undefined,
       });
     }
     // Newest first, matching what every screen expects.
@@ -270,6 +273,28 @@ export function importBackup(raw: unknown): ImportResult {
     led.tx = out;
   }
   if (droppedTx > 0) warnings.push(`skipped-tx:${droppedTx}`);
+
+  // ---- fields this app added ----------------------------------------------
+  // Older backups simply lack these, and `num`/guards leave them null, so a
+  // file from the original PWA still imports cleanly.
+  const floor = num(d.minDailySpend);
+  led.minDailySpend = floor != null && floor > 0 ? floor : null;
+
+  if (d.baseline && typeof d.baseline === 'object') {
+    const b = d.baseline as Record<string, unknown>;
+    const ts = num(b.ts);
+    if (ts != null) {
+      led.baseline = { ts, cycleSpentBefore: num(b.cycleSpentBefore, 0) ?? 0 };
+    }
+  }
+
+  if (d.goalMode && typeof d.goalMode === 'object') {
+    const modes: Record<string, 'fixed' | 'stretch' | 'horizon'> = {};
+    for (const [k, v] of Object.entries(d.goalMode as Record<string, unknown>)) {
+      if (v === 'fixed' || v === 'stretch' || v === 'horizon') modes[k] = v;
+    }
+    led.goalMode = modes;
+  }
 
   // ---- merchant rules -----------------------------------------------------
   if (d.rules && typeof d.rules === 'object') {

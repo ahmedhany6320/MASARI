@@ -89,7 +89,16 @@ export interface LedgerStore {
   addPlannedTransfer: (t: Omit<PlannedTransfer, 'id'>) => void;
   removePlannedTransfer: (id: string) => void;
   /** Records an executed international transfer, moving money out of the bank. */
-  sendTransfer: (args: { amt: number; purpose?: string; memo?: string; goalId?: string; egp?: number }) => void;
+  sendTransfer: (args: {
+    amt: number;
+    fee?: number;
+    rate?: number;
+    to?: string;
+    purpose?: string;
+    memo?: string;
+    goalId?: string;
+    egp?: number;
+  }) => void;
 
   addOvertime: (e: Omit<OvertimeEntry, 'id'>) => void;
   removeOvertime: (id: string) => void;
@@ -273,14 +282,22 @@ export const useLedger = create<LedgerStore>()(
       removePlannedTransfer: (id) =>
         set((s) => ({ ledger: { ...s.ledger, planTf: s.ledger.planTf.filter((t) => t.id !== id) } })),
 
-      sendTransfer: ({ amt, purpose, memo, goalId, egp }) => {
+      sendTransfer: ({ amt, fee, rate, to, purpose, memo, goalId, egp }) => {
+        // The fee leaves the bank alongside the transfer, so the ledger records
+        // the full amount that actually left. Storing the fee separately keeps
+        // it reportable without a second entry to reconcile.
         get().addTx({
           ts: Date.now(),
           type: 'remit',
-          amt,
-          m: memo,
-          mEn: memo,
+          amt: amt + (fee ?? 0),
+          m: memo ?? to,
+          mEn: memo ?? to,
           purpose: purpose ?? 'other',
+          fee: fee && fee > 0 ? fee : undefined,
+          // The rate is frozen at send time: history must not be rewritten
+          // every time the exchange rate moves.
+          rate,
+          to,
         });
         // A transfer earmarked for a goal also credits that goal, in the goal's
         // own currency — otherwise the money would leave the bank and vanish

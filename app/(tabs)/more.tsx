@@ -3,6 +3,7 @@ import { ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CloudSync } from '../../src/components/CloudSync';
 import { NotificationSettings } from '../../src/components/NotificationSettings';
+import { ExportBackup } from '../../src/components/ExportBackup';
 import { RestoreBackup } from '../../src/components/RestoreBackup';
 import { Tile, TileGrid } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../../src/components/ui';
@@ -184,6 +185,8 @@ export default function MoreScreen() {
         </Card>
 
         <CloudSync />
+
+        <ExportBackup />
 
         <RestoreBackup />
 

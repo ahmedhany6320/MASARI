@@ -73,6 +73,12 @@ export interface Tx {
   back?: number;
   /** For `remit`: `goal` transfers are savings, not spending. */
   purpose?: string;
+  /** For `remit`: transfer fee, in the salary currency. */
+  fee?: number;
+  /** For `remit`: the FX rate used, so history is not rewritten when it moves. */
+  rate?: number;
+  /** For `remit`: who it went to. */
+  to?: string;
 }
 
 export interface Category {
