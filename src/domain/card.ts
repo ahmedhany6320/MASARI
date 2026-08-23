@@ -73,3 +73,118 @@ export function cardPosition(
     out: stmtRem + unbilled,
   };
 }
+
+export interface CardCarryover {
+  /**
+   * Unbilled card spending dated inside the current cycle. This is ALREADY
+   * counted as ordinary expenses in the cycle's spending total, so deducting
+   * it from the salary again would charge the same dirhams twice.
+   */
+  unbilledCycle: number;
+  /**
+   * Unbilled card spending carried in from before the cycle — the opening
+   * `unbilled0` plus any purchase made in an earlier cycle that no statement
+   * has closed over yet.
+   *
+   * This is the piece that appears in no other total: it is not in this
+   * cycle's spending, and it is not in the issued statement. Left out, it is
+   * money the card will demand that the daily limit never knew about.
+   */
+  unbilledCarried: number;
+}
+
+/**
+ * Splits unbilled card spending into the part this cycle already accounts for
+ * and the part carried in from before it.
+ *
+ * `from` must be the same instant the cycle's spending total is summed from,
+ * otherwise the two halves describe different periods and the split stops
+ * adding up.
+ */
+export function cardCarryover(
+  s: Pick<Ledger, 'cardSetup' | 'cardAdj' | 'cardCfg' | 'tx'>,
+  from: number,
+): CardCarryover {
+  const { unbilled } = cardPosition(s);
+  const spentOnCard = s.tx
+    .filter((x) => posts(x) && x.type === 'expense' && x.acct === 'card' && x.ts >= from)
+    .reduce((a, x) => a + x.amt, 0);
+
+  // Payments land on the statement first and only the leftover touches
+  // unbilled, so a big payment can leave less unbilled than was spent this
+  // cycle. Clamping keeps the two parts summing to `unbilled` exactly.
+  const unbilledCycle = Math.min(unbilled, spentOnCard);
+  return { unbilledCycle, unbilledCarried: Math.max(0, unbilled - unbilledCycle) };
+}
+
+export interface CardClaim {
+  // ---- charged against THIS month's salary, via the daily limit ----------
+  /** Last cycle's issued statement, payable now. */
+  statement: number;
+  /** This month's installment charge. */
+  installment: number;
+  /** Unbilled spending carried in from before this cycle. */
+  carried: number;
+  /** statement + installment + carried — the figure the living pool loses. */
+  due: number;
+
+  // ---- charged this month, but counted elsewhere -------------------------
+  /**
+   * This cycle's own card spending. Real, charged, and already sitting in the
+   * cycle's expense total — which is why it is not in `due`.
+   */
+  cycleUnbilled: number;
+
+  // ---- owed, but legitimately deferred -----------------------------------
+  /** The installment plan's remaining balance. */
+  installmentBalance: number;
+  /** Installment balance beyond this month's charge, spread over later months. */
+  deferred: number;
+  /**
+   * True when an installment balance exists but no monthly charge was ever
+   * declared. The plan then defers the WHOLE balance with no schedule behind
+   * it — the one way the card can still hold money this app cannot see.
+   */
+  installmentUnknown: boolean;
+
+  // ---- totals ------------------------------------------------------------
+  /** Everything the card is owed: revolving balance plus installment plan. */
+  totalOwed: number;
+  /** Everything this month's salary is charged for, counted exactly once. */
+  chargedThisMonth: number;
+}
+
+/**
+ * The complete statement of what the credit card claims, and when.
+ *
+ * The point is auditability. Every dirham the card holds lands in exactly one
+ * of three places — deducted from this month's limit, already counted as this
+ * cycle's spending, or deferred to later months — and the three add back up to
+ * the total owed. Anything that cannot be placed shows up as
+ * `installmentUnknown` rather than quietly rounding to zero, because a
+ * liability the app silently ignores is worse than one it admits it cannot
+ * schedule.
+ */
+export function cardClaim(
+  s: Pick<Ledger, 'cardSetup' | 'cardAdj' | 'cardCfg' | 'tx'>,
+  cycleFrom: number,
+): CardClaim {
+  const cc = cardPosition(s);
+  const { unbilledCycle, unbilledCarried } = cardCarryover(s, cycleFrom);
+
+  const due = cc.stmtRem + cc.instMo + unbilledCarried;
+  const deferred = Math.max(0, cc.instBal - cc.instMo);
+
+  return {
+    statement: cc.stmtRem,
+    installment: cc.instMo,
+    carried: unbilledCarried,
+    due,
+    cycleUnbilled: unbilledCycle,
+    installmentBalance: cc.instBal,
+    deferred,
+    installmentUnknown: cc.instBal > 0 && cc.instMo <= 0,
+    totalOwed: cc.stmtRem + cc.unbilled + cc.instBal,
+    chargedThisMonth: due + unbilledCycle,
+  };
+}

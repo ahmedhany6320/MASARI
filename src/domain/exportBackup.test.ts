@@ -77,10 +77,14 @@ describe('buildBackup', () => {
 
   it('leaves the new fields empty for a backup from the original app', () => {
     // The real fixture predates all three, and must still import cleanly.
+    // They land on their empty values rather than `undefined` so that a
+    // factory reset survives the JSON round-trip the persistence layer does —
+    // `JSON.stringify` drops undefined keys, and a dropped key gets refilled
+    // from the previous save on the next launch.
     const back = importBackup(real);
     expect(back.ledger.minDailySpend).toBeNull();
-    expect(back.ledger.baseline).toBeUndefined();
-    expect(back.ledger.goalMode).toBeUndefined();
+    expect(back.ledger.baseline).toBeNull();
+    expect(back.ledger.goalMode).toEqual({});
   });
 
   it('ignores a goal mode it does not recognise', () => {

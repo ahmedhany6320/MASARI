@@ -1,5 +1,5 @@
 import { bankBalance, cashBalance } from './balances';
-import { cardPosition, type CardPosition } from './card';
+import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPosition } from './card';
 import { goalsMonthlyRequirement } from './goals';
 import type { Ledger } from './types';
 
@@ -15,11 +15,34 @@ export interface SafeSpend {
   /** Everything the card will demand: statement + unbilled + this month's installment. */
   cardObl: number;
   /**
-   * What the card actually takes OUT of this month's salary: the statement
-   * issued for last cycle plus this month's installment. This is deducted from
-   * the living pool; `cardObl` is the wider display figure.
+   * What the card takes OUT of this month's salary: the issued statement, this
+   * month's installment, and unbilled spending carried in from before the
+   * cycle. Deducted from the living pool; `cardObl` is the wider display
+   * figure.
    */
   cardDue: number;
+  /** `cardDue` itemised, so the breakdown can show its working. */
+  cardDueParts: {
+    /** Last cycle's issued statement, still unpaid. */
+    statement: number;
+    /** This month's installment charge. */
+    installment: number;
+    /** Unbilled spending from before this cycle — the piece nothing else counts. */
+    carried: number;
+  };
+  /**
+   * This cycle's own card spending. Already inside `cycleSpend`, so it is NOT
+   * in `cardDue` — surfaced only so the breakdown can say where it went.
+   */
+  cardCycleUnbilled: number;
+  /**
+   * What the card will bill next month if nothing else is charged: everything
+   * currently unbilled, plus the installment that keeps running. A forward
+   * cash-flow warning, not a deduction from this month.
+   */
+  cardNextBill: number;
+  /** The full, auditable statement of what the card claims and when. */
+  cardClaim: CardClaim;
   /** Planned international transfers. */
   planT: number;
   /** Monthly goal contribution actually reserved, after protecting the floor. */
@@ -98,23 +121,45 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     .filter((c) => !c.paused && !c.paidMonth && (c.amt ?? 0) > 0)
     .reduce((a, c) => a + (c.amt ?? 0), 0);
 
+  /*
+   * A baseline set during THIS cycle means the user declared their real
+   * position part-way through the month: spending before that moment is
+   * already reflected in the balances they stated, so it is taken from
+   * `cycleSpentBefore` rather than re-summed from the ledger. Counting both
+   * would charge that spending twice; counting neither would hand back a full
+   * month's allowance on day 16.
+   */
+  const baseTs = s.baseline && s.baseline.ts >= monthStart ? s.baseline.ts : null;
+  const spentBefore = baseTs != null ? (s.baseline?.cycleSpentBefore ?? 0) : 0;
+  const countFrom = baseTs != null ? Math.max(monthStart, baseTs) : monthStart;
+
   const cc = cardPosition(s);
   const cardObl = cc.stmtRem + cc.unbilled + cc.instMo;
+  const carry = cardCarryover(s, countFrom);
 
   /*
-   * What the card genuinely claims from THIS month's salary.
+   * What the card claims from THIS month's salary.
+   *
+   * Every dirham the card holds must be charged to the user exactly once —
+   * never zero times, never twice. Three parts, three different reasons:
    *
    *  - `stmtRem` is last cycle's statement, issued and payable now. That
    *    spending happened in a PREVIOUS cycle, so it is nowhere in this
-   *    cycle's `cycleSpend` — leaving it out made it invisible, and the app
-   *    handed back money that was already committed to the bank.
+   *    cycle's `cycleSpend`. It is deducted here.
    *  - `instMo` is this month's installment charge: a real, dated outflow.
+   *    Deducted here.
+   *  - `carry.unbilledCarried` is spending sitting on the card from before
+   *    this cycle that no statement has closed over yet — the opening
+   *    `unbilled0` and any earlier-cycle purchase. It is in NO other total,
+   *    so leaving it out was a genuine hole: the card was quietly holding
+   *    money the daily limit had already handed back. Deducted here.
    *
-   * `unbilled` is deliberately NOT deducted. That is this cycle's card
-   * spending, already counted as expenses in `cycleSpend`; subtracting it
-   * here as well would charge the same dirhams to the user twice.
+   * `carry.unbilledCycle` is the one part deliberately NOT deducted. That is
+   * this cycle's own card spending, already counted as expenses inside
+   * `cycleSpend`; subtracting it here as well would charge it twice and halve
+   * the limit on every card purchase.
    */
-  const cardDue = cc.stmtRem + cc.instMo;
+  const cardDue = cc.stmtRem + cc.instMo + carry.unbilledCarried;
 
   const planT = s.planTf.reduce((a, p) => a + p.amt, 0);
 
@@ -133,18 +178,6 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const goalAsked = goalsMonthlyRequirement(s.goals, fx);
   const goalReq = Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
-
-  /*
-   * A baseline set during THIS cycle means the user declared their real
-   * position part-way through the month: spending before that moment is
-   * already reflected in the balances they stated, so it is taken from
-   * `cycleSpentBefore` rather than re-summed from the ledger. Counting both
-   * would charge that spending twice; counting neither would hand back a full
-   * month's allowance on day 16.
-   */
-  const baseTs = s.baseline && s.baseline.ts >= monthStart ? s.baseline.ts : null;
-  const spentBefore = baseTs != null ? (s.baseline?.cycleSpentBefore ?? 0) : 0;
-  const countFrom = baseTs != null ? Math.max(monthStart, baseTs) : monthStart;
 
   const cycleSpend =
     spentBefore +
@@ -176,6 +209,14 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     commitObl,
     cardObl,
     cardDue,
+    cardDueParts: {
+      statement: cc.stmtRem,
+      installment: cc.instMo,
+      carried: carry.unbilledCarried,
+    },
+    cardCycleUnbilled: carry.unbilledCycle,
+    cardClaim: cardClaim(s, countFrom),
+    cardNextBill: cc.unbilled + cc.instMo,
     planT,
     goalReq,
     goalAsked,

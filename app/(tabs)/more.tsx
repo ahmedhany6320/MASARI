@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ScrollView, Switch, View } from 'react-native';
+import { Alert, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CloudSync } from '../../src/components/CloudSync';
 import { NotificationSettings } from '../../src/components/NotificationSettings';
@@ -49,6 +49,28 @@ export default function MoreScreen() {
   const cardNeedsSetup = ledger.cardSetup == null && ledger.cardCfg.limit === 0;
   const goalNeedsDeadline = ledger.goals.some((g) => g.target != null && g.months == null);
   const salaryPending = ledger.salStatus !== 'received';
+
+  /*
+   * Erasing everything is irreversible and sits one tap from ordinary
+   * settings, so it confirms first — and the confirmation names the backup
+   * section sitting directly above it on this same screen. Afterwards it sends
+   * the user to onboarding rather than leaving them on a settings screen full
+   * of zeroes.
+   */
+  function confirmReset() {
+    Alert.alert(t('resetConfirmT'), t('resetConfirmB'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('resetGo'),
+        style: 'destructive',
+        onPress: () => {
+          reset();
+          Alert.alert(t('resetDoneT'), t('resetDoneB'));
+          router.replace('/onboarding');
+        },
+      },
+    ]);
+  }
 
   return (
     <Screen>
@@ -191,10 +213,10 @@ export default function MoreScreen() {
         <RestoreBackup />
 
         <Card>
-          <Title>{t('dataBackup')}</Title>
+          <Title>{t('resetT')}</Title>
           <Caption>{t('resetS')}</Caption>
           <View style={{ marginTop: SPACE.md }}>
-            <Button label={t('resetBtn')} variant="secondary" onPress={reset} />
+            <Button label={t('resetBtn')} variant="secondary" onPress={confirmReset} />
           </View>
         </Card>
       </ScrollView>

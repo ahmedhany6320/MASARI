@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, DayPicker, Sheet, TextField } from '../src/components/fields';
+import { CardClaimBreakdown } from '../src/components/CardClaim';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../src/components/ui';
 import { parseAmount, type Account } from '../src/domain';
-import { useCardPosition, useLocalization, usePalette } from '../src/store/selectors';
+import { useCardPosition, useLocalization, usePalette, useSafeSpend } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 import { SPACE } from '../src/theme/tokens';
 
@@ -23,6 +24,9 @@ export default function CardScreen() {
   const { t, money, num } = useLocalization();
   const insets = useSafeAreaInsets();
   const cc = useCardPosition();
+  // The claim comes from the same engine the daily limit reads, so this
+  // screen can never disagree with Home about what the card costs.
+  const claim = useSafeSpend().cardClaim;
 
   const ledger = useLedger((s) => s.ledger);
   const setCardSetup = useLedger((s) => s.setCardSetup);
@@ -121,6 +125,15 @@ export default function CardScreen() {
             </View>
           </Card>
         )}
+
+        {/*
+          Placed above the raw position, because "what does this cost me this
+          month" is the question someone opens this screen with — the balances
+          below are the evidence for it, not the answer.
+        */}
+        <Card>
+          <CardClaimBreakdown claim={claim} />
+        </Card>
 
         <Card>
           <Title>{t('cardCalcT')}</Title>

@@ -148,10 +148,35 @@ describe('safeSpend — the daily limit', () => {
 
   it('excludes spending from a previous cycle', () => {
     const july = new Date(2026, 6, 20).getTime();
-    const s = ledger({ tx: [spend(5000, july)] });
+    const s = ledger({ tx: [spend(5000, july, { acct: 'bank' })] });
     const c = safeSpend(s, FX, NOW);
     expect(c.cycleSpend).toBe(0);
     expect(c.ssl).toBe(500);
+  });
+
+  it('still charges last cycle CARD spending, which the card has yet to bill', () => {
+    // Paid from the bank it is spent and gone; left on the card it is a debt
+    // this salary has to clear. Excluding it from `cycleSpend` is right, but
+    // dropping it entirely handed the user back 5,000 they do not have.
+    const july = new Date(2026, 6, 20).getTime();
+    const s = ledger({ tx: [spend(5000, july, { acct: 'card' })] });
+    const c = safeSpend(s, FX, NOW);
+    expect(c.cycleSpend).toBe(0);
+    expect(c.cardDueParts.carried).toBe(5000);
+    expect(c.livingPool).toBe(6000);
+    expect(c.ssl).toBeCloseTo(6000 / 22, 10);
+  });
+
+  it('charges this cycle card spending once, through cycleSpend only', () => {
+    const s = ledger({ tx: [spend(1000, MONTH_START + 86400e3, { acct: 'card' })] });
+    const c = safeSpend(s, FX, NOW);
+    // In cycleSpend, and therefore deliberately NOT in cardDue.
+    expect(c.cycleSpend).toBe(1000);
+    expect(c.cardCycleUnbilled).toBe(1000);
+    expect(c.cardDueParts.carried).toBe(0);
+    expect(c.cardDue).toBe(0);
+    // Charged exactly once: 11,000 − 1,000, not − 2,000.
+    expect(c.spendable).toBe(10000);
   });
 
   it('counts spending on every account, not just the card', () => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RestoreBackup } from '../src/components/RestoreBackup';
-import { Body, Button, Caption, Card, Screen, Title } from '../src/components/ui';
+import { Body, Button, Caption, Card, Row, Screen, Title } from '../src/components/ui';
 import { parseAmount } from '../src/domain';
 import { useLocalization, usePalette } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
@@ -32,10 +32,28 @@ export default function OnboardingScreen() {
   const [salary, setSalary] = useState('');
   const [bank, setBank] = useState('');
   const [commitment, setCommitment] = useState('');
+  const [cardStmt, setCardStmt] = useState('');
+  const [cardUnbilled, setCardUnbilled] = useState('');
+  const [cardInstBal, setCardInstBal] = useState('');
+  const [cardInstMo, setCardInstMo] = useState('');
 
   const salaryVal = parseAmount(salary);
   const bankVal = parseAmount(bank) ?? 0;
   const commitVal = parseAmount(commitment) ?? 0;
+  const stmtVal = parseAmount(cardStmt) ?? 0;
+  const unbilledVal = parseAmount(cardUnbilled) ?? 0;
+  const instBalVal = parseAmount(cardInstBal) ?? 0;
+  const instMoVal = parseAmount(cardInstMo) ?? 0;
+  const hasCard = stmtVal > 0 || unbilledVal > 0 || instBalVal > 0 || instMoVal > 0;
+
+  /*
+   * What the card takes from the first salary. Nothing has been spent inside
+   * the app yet, so every dirham declared here is carried-in balance and the
+   * whole revolving amount is charged to this month — the installment plan
+   * being the one part that spreads.
+   */
+  const cardDue = stmtVal + unbilledVal + instMoVal;
+  const pool = Math.max(0, (salaryVal ?? 0) - commitVal - cardDue);
 
   // Salary is the only genuinely required figure: without it there is no cycle
   // to divide, and the whole limit is meaningless.
@@ -46,6 +64,9 @@ export default function OnboardingScreen() {
     completeOnboarding({
       base: salaryVal,
       bankOpen: bankVal,
+      cardSetup: hasCard
+        ? { stmt0: stmtVal, unbilled0: unbilledVal, instBal: instBalVal, instMo: instMoVal }
+        : null,
       commits:
         commitVal > 0
           ? [
@@ -72,7 +93,7 @@ export default function OnboardingScreen() {
   ) => (
     <View style={{ marginBottom: SPACE.xl }}>
       <Body>{label}</Body>
-      <Caption>{hint}</Caption>
+      {hint !== '' && <Caption>{hint}</Caption>}
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -123,13 +144,43 @@ export default function OnboardingScreen() {
             {field(t('segCommit'), t('commitHint'), commitment, setCommitment)}
           </Card>
 
+          {/*
+            The card is asked for up front rather than left to a settings
+            screen. Skipping it does not make the limit safer — it makes it
+            wrong in the generous direction, which is the failure mode that
+            actually costs money.
+          */}
+          <Card>
+            <Title>{t('creditCard')}</Title>
+            <Caption>{t('obCardSkip')}</Caption>
+            {field(t('stmtRem'), t('startCardHint'), cardStmt, setCardStmt)}
+            {field(t('unbilled'), '', cardUnbilled, setCardUnbilled)}
+            {field(t('instBal'), '', cardInstBal, setCardInstBal)}
+            {field(t('instMo'), '', cardInstMo, setCardInstMo)}
+          </Card>
+
           {canFinish && (
             <Card>
-              <Caption>{t('livingPool')}</Caption>
-              <Body style={{ fontSize: FONT.large, fontWeight: '700', color: p.accent }}>
-                {money(Math.max(0, salaryVal - commitVal))}
+              <Title>{t('obPreviewT')}</Title>
+              <View style={{ marginTop: SPACE.sm }}>
+                <Row label={t('salaryWork')} value={money(salaryVal)} />
+                {commitVal > 0 && <Row label={t('segCommit')} value={`− ${money(commitVal)}`} />}
+                {cardDue > 0 && (
+                  <Row
+                    label={t('cardDueLabel')}
+                    value={`− ${money(cardDue)}`}
+                    valueColor={p.negative}
+                  />
+                )}
+                <Row label={t('livingPool')} value={money(pool)} valueColor={p.ink} />
+              </View>
+              <Body style={{ fontSize: FONT.large, fontWeight: '700', color: p.accent, marginTop: SPACE.md }}>
+                {money(pool / 30)} / {t('perDay')}
               </Body>
-              <Caption style={{ marginTop: SPACE.sm }}>{t('sslNote')}</Caption>
+              {instBalVal > 0 && instMoVal <= 0 && (
+                <Caption style={{ color: p.warn, marginTop: SPACE.sm }}>{t('instUnknownB')}</Caption>
+              )}
+              <Caption style={{ marginTop: SPACE.sm }}>{t('obLater')}</Caption>
             </Card>
           )}
 

@@ -167,14 +167,25 @@ describe('safeSpend — card dues are deducted from the living pool', () => {
     // 1,286 statement was spent LAST cycle, so it is not in cycleSpend and
     // would otherwise be invisible to the daily limit.
     expect(c.cc.stmtRem).toBe(1286);
-    expect(c.cardDue).toBe(1286);
-    expect(c.livingPool).toBe(11000 - 1286);
+    expect(c.cardDueParts.statement).toBe(1286);
   });
 
-  it('does NOT subtract unbilled spending, which is already an expense', () => {
-    expect(c.cc.unbilled).toBeGreaterThan(0);
-    // Were unbilled deducted too, the pool would drop by it a second time.
-    expect(c.livingPool).toBe(11000 - c.cardDue);
+  it('also subtracts unbilled spending carried in from before the cycle', () => {
+    // Of 790.79 unbilled, 681.81 was spent this cycle and is already an
+    // expense. The remaining 108.98 predates the cycle: in no other total, and
+    // until this was fixed, deducted nowhere at all.
+    expect(c.cc.unbilled).toBeCloseTo(790.79, 2);
+    expect(c.cardCycleUnbilled).toBeCloseTo(681.81, 2);
+    expect(c.cardDueParts.carried).toBeCloseTo(108.98, 2);
+    expect(c.cardDue).toBeCloseTo(1394.98, 2);
+    expect(c.livingPool).toBeCloseTo(11000 - 1394.98, 2);
+  });
+
+  it('does NOT subtract this cycle unbilled spending, already an expense', () => {
+    expect(c.cardCycleUnbilled).toBeGreaterThan(0);
+    // Were it deducted here too, the pool would drop by it a second time.
+    expect(c.livingPool).toBeCloseTo(11000 - c.cardDue, 10);
+    expect(c.cardDue).toBeLessThan(c.cc.stmtRem + c.cc.unbilled + c.cc.instMo);
   });
 
   it('lowers the daily limit accordingly', () => {
@@ -186,7 +197,7 @@ describe('safeSpend — card dues are deducted from the living pool', () => {
   it('feeds a capacity that matches the real ledger', () => {
     const burn = burnRate(ledger, c.livingPool, NOW);
     const poolBeforeGoal = ledger.base - c.commitObl - c.planT - c.cardDue;
-    expect(poolBeforeGoal).toBe(9714);
+    expect(poolBeforeGoal).toBeCloseTo(9605.02, 2);
     expect(burn.projectedMonth).toBeGreaterThan(0);
   });
 });

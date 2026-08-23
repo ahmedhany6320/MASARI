@@ -64,5 +64,12 @@ export function emptyLedger(makeId: () => string = defaultId): Ledger {
     rules: {},
 
     savTarget: null,
+
+    // Stated explicitly rather than left undefined so a factory reset provably
+    // clears them: `JSON.stringify` drops undefined keys, which would leave a
+    // stale value to be merged back in on the next launch.
+    minDailySpend: null,
+    baseline: null,
+    goalMode: {},
   };
 }
