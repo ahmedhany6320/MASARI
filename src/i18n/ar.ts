@@ -636,6 +636,8 @@ export const ar = {
   cardBillNow: 'فاتورة الشهر ده',
   cardBillNowNote: 'كشف الحساب المستحق + قسط الشهر. ده اللي مطلوب منك تدفعه دلوقتي.',
   cardPayNote: 'أول ما تدفع الفاتورة، القسط بيتخصم من إجمالي الأقساط أوتوماتيك.',
+  buildT: 'نسخة التطبيق',
+  buildNote: 'لو الرقم ده مش زي اللي في رسالة التحديث، يبقى الجهاز لسه شغال على النسخة القديمة.',
 } as const;
 
 export type StringKey = keyof typeof ar;

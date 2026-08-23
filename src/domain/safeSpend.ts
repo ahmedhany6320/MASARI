@@ -1,9 +1,9 @@
 import { bankBalance, cashBalance } from './balances';
 import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPosition } from './card';
 import { commitmentsDue, type CommitmentsDue } from './commitments';
-import { fundGoals, type FundingPlan } from './funding';
+import { fundedGoals, fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
-import type { Ledger } from './types';
+import type { Goal, Ledger } from './types';
 
 export interface SafeSpend {
   bank: number;
@@ -14,6 +14,12 @@ export interface SafeSpend {
   protectedAlloc: number;
   /** Which goal each dirham of the balance is serving. */
   funding: FundingPlan;
+  /**
+   * The goals with `alloc` resolved to what actually backs them. Screens and
+   * calculations should read these rather than `ledger.goals`, whose `alloc`
+   * is meaningless for a goal funded from the balance.
+   */
+  goals: Goal[];
   /** Commitments still owed this cycle, after date and paid-status checks. */
   commitObl: number;
   /** Every commitment's standing this cycle: due date, state, what it claims. */
@@ -189,9 +195,8 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const floorMonthly = Math.max(0, s.minDailySpend ?? 0) * daysInMonth;
   const basisPool = s.sslBasis === 'balance' ? bank + (cash ?? 0) : s.base;
   const poolBeforeGoal = basisPool - commitObl - planT - cardDue;
-  const goalAsked = goalsMonthlyRequirement(s.goals, fx, (g) =>
-    funding.goals.find((x) => x.goal.id === g.id)?.held ?? g.alloc,
-  );
+  const goals = fundedGoals(funding);
+  const goalAsked = goalsMonthlyRequirement(goals, fx);
   const goalReq = Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
 
@@ -249,6 +254,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     liquid,
     protectedAlloc,
     funding,
+    goals,
     commitObl,
     commitments,
     cardObl,

@@ -638,4 +638,6 @@ export const en: Record<StringKey, string> = {
   cardBillNow: 'This month bill',
   cardBillNowNote: 'The statement due plus this month installment. What you are being asked to pay right now.',
   cardPayNote: 'Once you pay the bill, the installment comes off the plan balance automatically.',
+  buildT: 'App version',
+  buildNote: 'If this does not match the version in the update message, the device is still running the old build.',
 };

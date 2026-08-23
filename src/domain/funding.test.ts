@@ -123,3 +123,30 @@ describe('fundGoals — edges', () => {
     expect(heldFor(fundGoals([g], 5000, FX), 'nope')).toBe(0);
   });
 });
+
+describe('legacy goals migrate to drawing from the balance', () => {
+  it('treats a never-configured goal as auto', () => {
+    // Every goal predating the funding source was written `auto: false,
+    // alloc: 0` because nothing could set either — the exact state that left
+    // "saved so far" pinned at zero however much was in the bank.
+    const legacy = goal({ auto: false, alloc: 0, target: 20000, currency: 'AED' });
+    const plan = fundGoals([legacy], 2144, FX);
+    expect(plan.goals[0]?.held).toBe(2144);
+    expect(plan.goals[0]?.fromBalance).toBe(true);
+  });
+
+  it('leaves a manual goal with a real figure alone', () => {
+    const manual = goal({ auto: false, alloc: 3000 });
+    const plan = fundGoals([manual], 9000, FX);
+    expect(plan.goals[0]?.held).toBe(3000);
+    expect(plan.goals[0]?.fromBalance).toBe(false);
+  });
+
+  it('funds an EGP goal from the account it can actually see', () => {
+    // The reported case: a 1,100,000 EGP target showing 0 saved against a
+    // 2,144 AED balance.
+    const egypt = goal({ id: 'egypt', auto: false, alloc: 0, target: 1100000, currency: 'EGP' });
+    const plan = fundGoals([egypt], 2144, FX);
+    expect(plan.goals[0]?.held).toBe(2144);
+  });
+});

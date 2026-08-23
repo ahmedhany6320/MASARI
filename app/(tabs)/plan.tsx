@@ -6,6 +6,7 @@ import { Chips, DayPicker, Sheet, TextField } from '../../src/components/fields'
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import {
   commitmentsDue,
+  drawsFromBalance,
   heldFor,
   debtSummary,
   formatEgp,
@@ -97,7 +98,9 @@ export default function PlanScreen() {
       setAmount(g?.target != null ? String(g.target) : '');
       setMonths(g?.months != null ? String(g.months) : '');
       setCurrency(g && isEgpGoal(g) ? 'EGP' : 'AED');
-      setGoalAuto(g?.auto ? 'auto' : 'manual');
+      // Reflect what the goal actually does, not just its stored flag: a
+      // legacy goal has `auto: false` yet draws from the balance all the same.
+      setGoalAuto(g != null && drawsFromBalance(g) ? 'auto' : 'manual');
       setAllocDraft(g?.alloc ? String(g.alloc) : '');
     } else if (next.kind === 'budget') {
       setAmount(String(ledger.budgets[next.catId] ?? ''));

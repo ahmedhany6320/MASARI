@@ -16,6 +16,7 @@ import {
 } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
 import { SPACE } from '../../src/theme/tokens';
+import { version as APP_VERSION } from '../../package.json';
 
 /**
  * More — the hub.
@@ -236,6 +237,19 @@ export default function MoreScreen() {
         <ExportBackup />
 
         <RestoreBackup />
+
+        {/*
+          Stamped from package.json at build time. Without it there is no way
+          to tell a device running the new bundle from one still serving a
+          cached old one, which turns every "it did not change" into guesswork.
+        */}
+        <Card>
+          <Title>{t('buildT')}</Title>
+          <View style={{ marginTop: SPACE.sm }}>
+            <Row label={t('appName')} value={`v${APP_VERSION}`} valueColor={p.accentDeep} />
+          </View>
+          <Caption style={{ marginTop: SPACE.sm }}>{t('buildNote')}</Caption>
+        </Card>
 
         <Card>
           <Title>{t('resetT')}</Title>

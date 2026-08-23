@@ -79,14 +79,14 @@ export default function InsightsScreen() {
         <Title>{t('insights')}</Title>
 
         {/* ---- goal projections ---- */}
-        {ledger.goals.filter((g) => g.target).length > 0 && (
+        {c.goals.filter((g) => g.target).length > 0 && (
           <Card>
             <Title>{t('goalETA')}</Title>
             <Caption>{t('goalETANote')}</Caption>
             <View style={{ marginTop: SPACE.sm }}>
               <Button label={t('goalPlanT')} onPress={() => router.push('/goal-plan')} />
             </View>
-            {ledger.goals
+            {c.goals
               .filter((g) => g.target)
               .map((g) => {
                 const proj = goalProjection(g, capacity, fxRate, now);
@@ -254,7 +254,7 @@ export default function InsightsScreen() {
               {[10, 20, 30].map((pct) => {
                 const saved = (burn.projectedMonth * pct) / 100;
                 const newCapacity = capacity + saved;
-                const goal = ledger.goals.find((g) => g.target);
+                const goal = c.goals.find((g) => g.target);
                 const before = goal ? goalProjection(goal, capacity, fxRate, now) : null;
                 const after = goal ? goalProjection(goal, newCapacity, fxRate, now) : null;
                 const gain =

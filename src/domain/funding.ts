@@ -56,11 +56,30 @@ export interface FundingPlan {
  * `liquid` is bank plus cash only — never card headroom. A goal "funded" by a
  * credit limit is funded by debt.
  */
+/**
+ * Whether a goal draws from the balance.
+ *
+ * `auto` was declared long before anything read it, and every goal ever
+ * created — by the app, by onboarding, or by importing a backup — was written
+ * with `auto: false, alloc: 0`. That combination is therefore an artifact of a
+ * field nobody could set, not a decision anyone made: it describes a goal
+ * tracked by hand that has never had a figure entered, which is indis-
+ * tinguishable from one that was never configured at all.
+ *
+ * Reading it as auto migrates every existing goal to drawing from the balance
+ * without the user touching anything, which is the whole point. A manual goal
+ * with a real figure behind it is untouched, and choosing manual in the editor
+ * writes `auto: false` explicitly alongside an amount.
+ */
+export function drawsFromBalance(g: Goal): boolean {
+  return g.auto || g.alloc <= 0;
+}
+
 export function fundGoals(goals: Goal[], liquid: number, fx: number): FundingPlan {
   let left = Math.max(0, liquid);
 
   const out = goals.map((g): GoalFunding => {
-    if (!g.auto) {
+    if (!drawsFromBalance(g)) {
       /*
        * Declared by hand and taken at face value, uncapped and without
        * touching the balance. Manual is what you choose when the money sits
@@ -107,4 +126,24 @@ export function fundGoals(goals: Goal[], liquid: number, fx: number): FundingPla
 /** What a single goal holds under the plan, in the salary currency. */
 export function heldFor(plan: FundingPlan, goalId: string): number {
   return plan.goals.find((x) => x.goal.id === goalId)?.held ?? 0;
+}
+
+/**
+ * The goal as the funding plan sees it, with `alloc` set to what actually
+ * stands behind it.
+ *
+ * Several calculations — the goal plan, the adaptive outlook, the projection —
+ * each read `goal.alloc` through their own private helper. Threading a "held"
+ * argument into all of them would leave three signatures to keep in step and a
+ * fourth to forget. Resolving it once here and handing those functions a goal
+ * that already tells the truth means there is a single place where funding is
+ * decided, and no call site can quietly read the stale figure.
+ */
+export function fundedGoal(plan: FundingPlan, g: Goal): Goal {
+  return { ...g, alloc: heldFor(plan, g.id) };
+}
+
+/** Every goal, funded. Order is preserved. */
+export function fundedGoals(plan: FundingPlan): Goal[] {
+  return plan.goals.map((x) => ({ ...x.goal, alloc: x.held }));
 }

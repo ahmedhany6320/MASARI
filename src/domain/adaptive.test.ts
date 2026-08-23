@@ -227,14 +227,34 @@ describe('adaptive against the real backup', () => {
   const { ledger, settings } = importBackup(real);
   const withDeadline = ledger.goals.map((g) => (g.id === 'egypt' ? { ...g, months: 8 } : g));
 
-  it('an impossible deadline drives the limit to zero without a floor', () => {
+  it('counts the balance as progress the goal has already made', () => {
+    // The goal draws from the account, so the 23,255 held is not "nothing
+    // saved" — it is a third of the way there, and the deadline demands
+    // correspondingly less each month.
     const c = safeSpend({ ...ledger, goals: withDeadline }, settings.fxRate, NOW);
+    expect(c.funding.funded).toBe(c.liquid);
+    expect(c.goalAsked).toBeCloseTo(7203.42, 2);
+    expect(c.ssl).toBeGreaterThan(0);
+  });
+
+  it('demands far more of a goal credited with nothing', () => {
+    // The same deadline against an empty account: the contrast is exactly what
+    // funding from the balance fixes.
+    const broke = { ...ledger, goals: withDeadline, bankOpen: 0, cashOpen: 0, tx: [] };
+    const c = safeSpend(broke, settings.fxRate, NOW);
+    expect(c.funding.funded).toBe(0);
+    // The full 1,100,000 EGP over 8 months, with nothing credited against it.
+    expect(c.goalAsked).toBeCloseTo(1_100_000 / settings.fxRate / 8, 2);
+    expect(c.goalAsked).toBeGreaterThan(10000);
     expect(c.ssl).toBe(0);
   });
 
-  it('and stays livable once a floor is declared', () => {
+  it('still caps a goal that outruns the pool, and says so', () => {
+    // Two months instead of eight: now the ask genuinely exceeds what is
+    // there, the floor holds part of it back, and the limit stays livable.
+    const rush = ledger.goals.map((g) => (g.id === 'egypt' ? { ...g, months: 2 } : g));
     const c = safeSpend(
-      { ...ledger, goals: withDeadline, minDailySpend: 60 },
+      { ...ledger, goals: rush, minDailySpend: 60 },
       settings.fxRate,
       NOW,
     );

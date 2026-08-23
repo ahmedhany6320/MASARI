@@ -51,7 +51,12 @@ export default function GoalPlanScreen() {
 
   const minDaily = ledger.minDailySpend ?? 0;
 
-  const goals = ledger.goals.filter((g) => g.target != null);
+  /*
+   * Read from the engine's funded goals, not from the raw ledger. `alloc` on
+   * the raw record is zero for any goal drawing from the balance, which is
+   * what made this screen report "0 saved" against a funded account.
+   */
+  const goals = spend.goals.filter((g) => g.target != null);
   const [selectedId, setSelectedId] = useState<string | null>(params.id ?? goals[0]?.id ?? null);
   const goal = goals.find((g) => g.id === selectedId) ?? goals[0] ?? null;
 
