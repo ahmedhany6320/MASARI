@@ -1,27 +1,21 @@
 {
-  "cli": {
-    "version": ">= 5.0.0",
-    "appVersionSource": "remote"
-  },
+  "cli": { "version": ">= 5.0.0", "appVersionSource": "local" },
   "build": {
+    "//": "preview builds a plain APK that installs by tapping it — no Play Store, no Android Studio, and no Expo Go. This is the profile to use for putting the app on your own phone.",
+    "preview": {
+      "android": { "buildType": "apk" },
+      "distribution": "internal",
+      "channel": "preview"
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "android": { "buildType": "apk" }
     },
     "production": {
+      "android": { "buildType": "app-bundle" },
       "autoIncrement": true
     }
   },
-  "submit": {
-    "production": {}
-  }
+  "submit": { "production": {} }
 }

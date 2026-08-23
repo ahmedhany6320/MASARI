@@ -12,6 +12,7 @@ import { useLocalization, usePalette, useSafeSpend } from '../../src/store/selec
 import { useLedger } from '../../src/store/useLedger';
 import { spendLadder, steeringGoal } from '../../src/domain';
 import { FONT, SPACE } from '../../src/theme/tokens';
+import { version as APP_VERSION } from '../../package.json';
 
 /**
  * Home — the Safe Spend Limit.
@@ -67,6 +68,16 @@ export default function HomeScreen() {
             }
           />
         )}
+
+        {/*
+          The build stamp, on the first screen rather than four taps into
+          settings. When an update "did not arrive", this is the single fact
+          that separates a code problem from a stale bundle on the device —
+          and it costs one line to never have to guess again.
+        */}
+        <Caption style={{ textAlign: rtl ? 'left' : 'right', opacity: 0.6 }}>
+          v{APP_VERSION}
+        </Caption>
 
         <Card>
           <Caption>{t('ssl')}</Caption>
