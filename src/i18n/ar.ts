@@ -660,6 +660,10 @@ export const ar = {
   planPerDirham: 'كل درهم توفره في اليوم',
   planPerDirhamNote: 'يزوّد الرقم اللي هتوصله بالمبلغ ده.',
   planNeedTarget: 'حدد هدف ومدة الأول عشان الخطة تشتغل.',
+  ladderT: 'لو صرفت غير كده',
+  ladderNote: 'اضغط على أي رقم تشوف هتوصل لكام لو مشيت عليه.',
+  ladderDaily: 'في اليوم',
+  ladderReaches: 'يوصل للهدف',
 } as const;
 
 export type StringKey = keyof typeof ar;

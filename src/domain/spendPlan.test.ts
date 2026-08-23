@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { projectAtPace, spendPlan, steeringGoal, type PlanInputs } from './spendPlan';
+import {
+  landingAt,
+  projectAtPace,
+  spendLadder,
+  spendPlan,
+  steeringGoal,
+  type PlanInputs,
+} from './spendPlan';
 import type { Goal } from './types';
 
 const FX = 13.6;
@@ -150,5 +157,58 @@ describe('projectAtPace — the landing figure moves with real spending', () => 
   it('never projects below what is already held', () => {
     if (p == null) throw new Error('expected a plan');
     expect(projectAtPace(p, g, 500, 99_999, 9605, FX)).toBeCloseTo(500 * FX, 6);
+  });
+});
+
+describe('landingAt and spendLadder — the plan you can push on', () => {
+  const g = goal();
+  const inp = inputs();
+  const p = spendPlan(g, inp);
+
+  it('lands lower the more you spend', () => {
+    const lean = landingAt(g, 40, inp, 8);
+    const loose = landingAt(g, 120, inp, 8);
+    expect(lean).toBeGreaterThan(loose);
+  });
+
+  it('agrees with the plan at the plan figure', () => {
+    if (p == null) throw new Error('expected a plan');
+    expect(landingAt(g, p.dailyAllowance, inp, p.months)).toBeCloseTo(p.projected, 6);
+  });
+
+  it('never lands below what is already held', () => {
+    expect(landingAt(g, 99_999, inp, 8)).toBeCloseTo(0, 6);
+    expect(landingAt(g, 99_999, inputs({ heldAed: 500 }), 8)).toBeCloseTo(500 * FX, 6);
+  });
+
+  it('offers a ladder that starts at the floor and climbs', () => {
+    if (p == null) throw new Error('expected a plan');
+    const ladder = spendLadder(g, p, inp);
+    expect(ladder.length).toBeGreaterThan(1);
+    expect(ladder[0]?.daily).toBe(60);
+    const dailies = ladder.map((x) => x.daily);
+    expect([...dailies].sort((a, b) => a - b)).toEqual(dailies);
+  });
+
+  it('shows the landing figure falling as the ladder climbs', () => {
+    if (p == null) throw new Error('expected a plan');
+    const ladder = spendLadder(g, p, inp);
+    const landings = ladder.map((x) => x.landing);
+    expect([...landings].sort((a, b) => b - a)).toEqual(landings);
+  });
+
+  it('marks which rungs actually reach the target', () => {
+    const reachable = goal({ target: 27_200, months: 2 });
+    const rp = spendPlan(reachable, inp);
+    if (rp == null) throw new Error('expected a plan');
+    const ladder = spendLadder(reachable, rp, inp);
+    expect(ladder.some((x) => x.reaches)).toBe(true);
+  });
+
+  it('offers nothing when there is no room to move', () => {
+    const tight = inputs({ poolBeforeGoal: 60 * 31, floorDaily: 60 });
+    const tp = spendPlan(g, tight);
+    if (tp == null) throw new Error('expected a plan');
+    expect(spendLadder(g, tp, tight)).toEqual([]);
   });
 });

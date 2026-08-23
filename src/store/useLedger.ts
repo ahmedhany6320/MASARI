@@ -487,10 +487,23 @@ export const useLedger = create<LedgerStore>()(
        */
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<LedgerStore>;
+        const savedLedger = { ...(saved.ledger ?? {}) };
+
+        /*
+         * One-time migration. Builds 0.13 and 0.14 wrote `sslBasis: 'salary'`
+         * into every ledger automatically, before the basis had any meaning
+         * worth choosing. Left in place it pins the limit to the salary cycle
+         * and stops a goal with a duration from ever steering — which is the
+         * default now. Clearing it restores "automatic"; anyone who genuinely
+         * wants the salary cycle can pick it again, and that choice sticks
+         * because this only ever runs against the stale default.
+         */
+        if (savedLedger.sslBasis === 'salary') delete savedLedger.sslBasis;
+
         return {
           ...current,
           ...saved,
-          ledger: { ...current.ledger, ...(saved.ledger ?? {}) },
+          ledger: { ...current.ledger, ...savedLedger },
           settings: {
             ...current.settings,
             ...(saved.settings ?? {}),

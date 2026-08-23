@@ -18,10 +18,12 @@ export function SpendPlanCard({
   plan,
   goal,
   projectedAtPace,
+  ladder,
 }: {
   plan: SpendPlan;
   goal: Goal;
   projectedAtPace: number | null;
+  ladder: { daily: number; landing: number; reaches: boolean }[];
 }) {
   const { t, money, num, lang, rtl } = useLocalization();
   const p = usePalette();
@@ -111,6 +113,32 @@ export function SpendPlanCard({
         <Row label={t('planPerDirham')} value={`+ ${fmt(plan.perDirhamPerDay)}`} valueColor={p.accentDeep} />
         <Caption style={{ marginTop: SPACE.xs }}>{t('planPerDirhamNote')}</Caption>
       </View>
+
+      {/*
+        The trade-off, made explorable. Reading a single prescribed figure
+        tells you what to do; seeing what the neighbouring figures cost tells
+        you why, which is the difference between following a plan and owning
+        one.
+      */}
+      {ladder.length > 1 && (
+        <View style={{ marginTop: SPACE.lg }}>
+          <Caption>{t('ladderT')}</Caption>
+          <View style={{ marginTop: SPACE.sm }}>
+            {ladder.map((step) => {
+              const current = Math.abs(step.daily - plan.dailyAllowance) < 0.5;
+              return (
+                <Row
+                  key={step.daily}
+                  label={`${money(step.daily)} ${t('ladderDaily')}${current ? ' •' : ''}`}
+                  value={fmt(step.landing)}
+                  valueColor={step.reaches ? p.positive : current ? p.ink : p.sub}
+                />
+              );
+            })}
+          </View>
+          <Caption style={{ marginTop: SPACE.xs }}>{t('ladderNote')}</Caption>
+        </View>
+      )}
 
       <View style={{ marginTop: SPACE.lg }}>
         <Button label={t('editGoal')} variant="secondary" onPress={() => router.push('/goal-plan')} />

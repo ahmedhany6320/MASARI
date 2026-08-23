@@ -10,7 +10,7 @@ import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../sr
 import { formatShortDate } from '../../src/i18n';
 import { useLocalization, usePalette, useSafeSpend } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
-import { steeringGoal } from '../../src/domain';
+import { spendLadder, steeringGoal } from '../../src/domain';
 import { FONT, SPACE } from '../../src/theme/tokens';
 
 /**
@@ -62,6 +62,9 @@ export default function HomeScreen() {
             plan={c.plan}
             goal={steeringGoalNow}
             projectedAtPace={c.planProjected}
+            ladder={
+              c.planInputs != null ? spendLadder(steeringGoalNow, c.plan, c.planInputs) : []
+            }
           />
         )}
 

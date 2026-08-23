@@ -3,7 +3,13 @@ import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPositi
 import { commitmentsDue, type CommitmentsDue } from './commitments';
 import { fundedGoals, fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
-import { projectAtPace, spendPlan, steeringGoal, type SpendPlan } from './spendPlan';
+import {
+  projectAtPace,
+  spendPlan,
+  steeringGoal,
+  type PlanInputs,
+  type SpendPlan,
+} from './spendPlan';
 import type { Goal, Ledger } from './types';
 
 export interface SafeSpend {
@@ -84,6 +90,12 @@ export interface SafeSpend {
    * than the pace the plan assumed. In the goal's own currency.
    */
   planProjected: number | null;
+  /**
+   * Exactly the inputs `plan` was built from. Exposed so callers exploring
+   * alternatives — "what if I spent more" — reuse them rather than rebuilding
+   * them and quietly disagreeing with the plan on screen beside them.
+   */
+  planInputs: PlanInputs | null;
   /** How far today has already run past its allowance. */
   overToday: number;
   /** What tomorrow looks like if today stops here. */
@@ -215,22 +227,30 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * not spend goes to the goal. So `goalReq` is derived from the spending
    * decision rather than competing with it.
    */
-  const steering = s.sslBasis === 'goal' ? steeringGoal(goals) : null;
-  const plan =
+  const steering = steeringGoal(goals);
+  const planInputs: PlanInputs | null =
     steering != null
-      ? spendPlan(steering, {
+      ? {
           poolBeforeGoal,
           daysInMonth,
           heldAed: steering.alloc,
           floorDaily: Math.max(0, s.minDailySpend ?? 0),
           fx,
-        })
+        }
       : null;
+  const plan = steering != null && planInputs != null ? spendPlan(steering, planInputs) : null;
 
-  const goalReq =
-    plan != null
-      ? plan.monthlyToGoal
-      : Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
+  /*
+   * A goal with both a target and a duration steers by default. Someone who
+   * sets both is asking exactly this question — "what do I spend to get
+   * there" — and making them find a setting first means they never see the
+   * answer. An explicit `sslBasis` overrides it either way.
+   */
+  const planSteers = plan != null && (s.sslBasis == null || s.sslBasis === 'goal');
+
+  const goalReq = planSteers
+    ? plan.monthlyToGoal
+    : Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
   // On the goal basis this reads as "how much less the goal gets than a
   // target-driven schedule would have demanded" — the price of staying livable.
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
@@ -258,8 +278,11 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * Both then hand the same figure to the same divider below, so everything
    * downstream — allowance, overspend, tomorrow — is untouched by the choice.
    */
-  const basis: 'salary' | 'balance' | 'goal' =
-    s.sslBasis === 'balance' ? 'balance' : s.sslBasis === 'goal' ? 'goal' : 'salary';
+  const basis: 'salary' | 'balance' | 'goal' = planSteers
+    ? 'goal'
+    : s.sslBasis === 'balance'
+      ? 'balance'
+      : 'salary';
 
   const livingPool =
     basis === 'balance'
@@ -290,7 +313,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * a number to chase.
    */
   const allowance =
-    plan != null
+    planSteers
       ? plan.dailyAllowance
       : spendable > 0
         ? (spendable + flexToday) / daysLeft
@@ -330,6 +353,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     ssl,
     basis,
     plan,
+    planInputs,
     planProjected:
       plan != null && steering != null
         ? projectAtPace(plan, steering, steering.alloc, cycleSpend, poolBeforeGoal, fx)

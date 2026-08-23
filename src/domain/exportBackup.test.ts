@@ -102,12 +102,20 @@ describe('buildBackup', () => {
     expect(back.ledger.commits[0]?.paidFor).toBe('2026-08');
   });
 
-  it('falls back to the salary basis for a backup that predates the choice', () => {
-    expect(importBackup(real).ledger.sslBasis).toBe('salary');
+  it('leaves the basis automatic for a backup that predates the choice', () => {
+    // Absent means automatic, which is what lets a goal with a duration steer
+    // spending. Defaulting it to 'salary' would silently switch that off.
+    expect(importBackup(real).ledger.sslBasis).toBeUndefined();
   });
 
   it('rejects a basis it does not recognise rather than storing it', () => {
-    expect(importBackup({ data: { sslBasis: 'vibes' } }).ledger.sslBasis).toBe('salary');
+    expect(importBackup({ data: { sslBasis: 'vibes' } }).ledger.sslBasis).toBeUndefined();
+  });
+
+  it('carries an explicit choice through unchanged', () => {
+    for (const b of ['salary', 'balance', 'goal'] as const) {
+      expect(importBackup({ data: { sslBasis: b } }).ledger.sslBasis).toBe(b);
+    }
   });
 
   it('ignores a goal mode it does not recognise', () => {

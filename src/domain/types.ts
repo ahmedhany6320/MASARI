@@ -305,7 +305,9 @@ export interface Ledger {
    *    over. The daily figure is FIXED for the cycle rather than re-divided as
    *    days pass, because the point is a number to hold yourself to.
    *
-   * Defaults to 'salary', which is what every existing save assumes.
+   * ABSENT MEANS AUTOMATIC, and automatic is the point: whenever a goal has
+   * both a target and a duration it steers, because that is what a user who
+   * set both was asking for. Naming a value here is an explicit override.
    */
   sslBasis?: 'salary' | 'balance' | 'goal';
 }

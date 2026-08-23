@@ -71,6 +71,8 @@ export function emptyLedger(makeId: () => string = defaultId): Ledger {
     minDailySpend: null,
     baseline: null,
     goalMode: {},
-    sslBasis: 'salary',
+    // Deliberately NOT set: absent means automatic, which lets a goal with a
+    // duration steer spending without the user first finding a setting.
+    sslBasis: undefined,
   };
 }

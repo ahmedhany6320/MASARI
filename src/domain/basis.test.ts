@@ -176,3 +176,44 @@ describe('the goal basis — fix the duration, the spend is the lever', () => {
     expect(c.allowance).toBeGreaterThan(0);
   });
 });
+
+describe('a planned goal steers without being switched on', () => {
+  const egypt: Goal = {
+    id: 'egypt', ar: 'مصر', en: 'Egypt', currency: 'EGP',
+    target: 1_100_000, alloc: 0, months: 8, extEgp: 0, auto: false,
+  };
+  const planned = (over: Partial<Ledger> = {}): Ledger => ({
+    ...emptyLedger(), base: 11000, minDailySpend: 60, goals: [egypt], ...over,
+  });
+
+  it('steers by default, with no basis chosen', () => {
+    // Setting a target and a duration IS the request. Requiring a settings
+    // toggle on top meant the answer was never seen.
+    const c = safeSpend(planned(), FX, NOW);
+    expect(c.basis).toBe('goal');
+    expect(c.plan).not.toBeNull();
+    expect(c.allowance).toBe(60);
+  });
+
+  it('yields to an explicit salary choice', () => {
+    const c = safeSpend(planned({ sslBasis: 'salary' }), FX, NOW);
+    expect(c.basis).toBe('salary');
+    // The plan is still computed, so the projection can be shown either way.
+    expect(c.plan).not.toBeNull();
+    expect(c.allowance).not.toBe(60);
+  });
+
+  it('yields to an explicit balance choice', () => {
+    expect(safeSpend(planned({ sslBasis: 'balance', bankOpen: 4000 }), FX, NOW).basis).toBe('balance');
+  });
+
+  it('stays on the salary cycle when no goal has a duration', () => {
+    const c = safeSpend(planned({ goals: [{ ...egypt, months: null }] }), FX, NOW);
+    expect(c.basis).toBe('salary');
+    expect(c.plan).toBeNull();
+  });
+
+  it('stays on the salary cycle when there are no goals at all', () => {
+    expect(safeSpend(planned({ goals: [] }), FX, NOW).basis).toBe('salary');
+  });
+});

@@ -290,8 +290,12 @@ export function importBackup(raw: unknown): ImportResult {
     }
   }
 
+  // Only an explicit, recognised choice is carried over; anything else leaves
+  // the basis automatic rather than pinning it to the salary cycle.
   led.sslBasis =
-    d.sslBasis === 'balance' ? 'balance' : d.sslBasis === 'goal' ? 'goal' : 'salary';
+    d.sslBasis === 'balance' || d.sslBasis === 'goal' || d.sslBasis === 'salary'
+      ? d.sslBasis
+      : undefined;
 
   if (d.goalMode && typeof d.goalMode === 'object') {
     const modes: Record<string, 'fixed' | 'stretch' | 'horizon'> = {};

@@ -152,6 +152,56 @@ export function spendPlan(goal: Goal, inp: PlanInputs): SpendPlan | null {
 }
 
 /**
+ * Where the goal lands at an arbitrary daily spend, in the goal's currency.
+ *
+ * This is the plan made explorable: the user moves the daily figure and
+ * watches the landing figure answer. A plan you can only read is an
+ * instruction; one you can push on is a decision you understand.
+ */
+export function landingAt(
+  goal: Goal,
+  daily: number,
+  inp: PlanInputs,
+  months: number,
+): number {
+  const pool = Math.max(0, inp.poolBeforeGoal);
+  const toGoal = Math.max(0, pool - Math.max(0, daily) * inp.daysInMonth);
+  const aed = inp.heldAed + toGoal * months;
+  return isEgpGoal(goal) ? aed * inp.fx : aed;
+}
+
+/**
+ * A ladder of daily-spend options around the plan, each with what it lands on.
+ *
+ * Anchored on the floor and the plan's own figure so the two reference points
+ * are always present, then spread upward — the direction that costs the goal
+ * something, which is the trade-off worth seeing.
+ */
+export function spendLadder(
+  goal: Goal,
+  plan: SpendPlan,
+  inp: PlanInputs,
+  steps = 5,
+): { daily: number; landing: number; reaches: boolean }[] {
+  const pool = Math.max(0, inp.poolBeforeGoal);
+  const maxDaily = pool / inp.daysInMonth;
+  const low = Math.max(0, Math.min(plan.dailyAllowance, plan.floorDaily));
+  if (maxDaily <= low) return [];
+
+  const out: { daily: number; landing: number; reaches: boolean }[] = [];
+  const seen = new Set<number>();
+  for (let i = 0; i < steps; i++) {
+    const daily = low + ((maxDaily - low) * i) / Math.max(1, steps - 1);
+    const rounded = Math.round(daily);
+    if (seen.has(rounded)) continue;
+    seen.add(rounded);
+    const landing = landingAt(goal, rounded, inp, plan.months);
+    out.push({ daily: rounded, landing, reaches: landing >= plan.target });
+  }
+  return out;
+}
+
+/**
  * Picks the goal that steers spending: the first with both a target and a
  * duration. Ordering is the user's, so it doubles as a statement of priority.
  */

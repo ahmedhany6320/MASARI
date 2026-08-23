@@ -662,4 +662,8 @@ export const en: Record<StringKey, string> = {
   planPerDirham: 'Every dirham a day you save',
   planPerDirhamNote: 'adds this much to what you will reach.',
   planNeedTarget: 'Set a target and a duration first so the plan can work.',
+  ladderT: 'If you spent differently',
+  ladderNote: 'Tap any figure to see where it would land you.',
+  ladderDaily: 'per day',
+  ladderReaches: 'reaches the goal',
 };
