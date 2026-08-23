@@ -133,7 +133,7 @@ export interface LedgerStore {
   /** How a goal is pursued: fixed amount+date, stretch the date, or fix the date. */
   setGoalMode: (goalId: string, mode: 'fixed' | 'stretch' | 'horizon') => void;
   /** Choose whether the daily limit is sized from the salary or the balance. */
-  setSslBasis: (basis: 'salary' | 'balance') => void;
+  setSslBasis: (basis: 'salary' | 'balance' | 'goal') => void;
 
   addCategory: (ar: string, en: string) => void;
   removeCategory: (id: string) => void;

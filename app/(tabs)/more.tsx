@@ -229,6 +229,15 @@ export default function MoreScreen() {
               onPress={() => setSslBasis('balance')}
             />
             <Caption>{t('basisBalanceNote')}</Caption>
+            <Button
+              label={t('basisGoal')}
+              variant={basis === 'goal' ? 'primary' : 'secondary'}
+              onPress={() => setSslBasis('goal')}
+            />
+            <Caption>{t('basisGoalNote')}</Caption>
+            {basis === 'goal' && goalNeedsDeadline && (
+              <Caption style={{ color: p.warn }}>{t('planNeedTarget')}</Caption>
+            )}
           </View>
         </Card>
 

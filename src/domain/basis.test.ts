@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyLedger } from './defaults';
 import { safeSpend } from './safeSpend';
-import type { Commitment, Ledger, Tx } from './types';
+import type { Commitment, Goal, Ledger, Tx } from './types';
 
 const FX = 13.6;
 // 14 Aug 2026 noon → 18 days to payday.
@@ -99,5 +99,80 @@ describe('commitments are scheduled, not just summed', () => {
     const c = safeSpend(led({ commits: [commit(0, 10)] }), FX, NOW);
     expect(c.commitObl).toBe(0);
     expect(c.commitments.incomplete).toBe(1);
+  });
+});
+
+describe('the goal basis — fix the duration, the spend is the lever', () => {
+  const egypt: Goal = {
+    id: 'egypt', ar: 'مصر', en: 'Egypt', currency: 'EGP',
+    target: 1_100_000, alloc: 0, months: 8, extEgp: 0, auto: false,
+  };
+
+  function goalLed(over: Partial<Ledger> = {}): Ledger {
+    return {
+      ...emptyLedger(),
+      base: 11000,
+      sslBasis: 'goal',
+      minDailySpend: 60,
+      goals: [egypt],
+      ...over,
+    };
+  }
+
+  it('holds the daily figure at the floor when the target is out of reach', () => {
+    const c = safeSpend(goalLed(), FX, NOW);
+    expect(c.basis).toBe('goal');
+    expect(c.plan?.source).toBe('floor');
+    expect(c.allowance).toBe(60);
+    expect(c.ssl).toBe(60);
+  });
+
+  it('does not re-divide by the days remaining', () => {
+    // The defining difference: the same figure on day 3 and on day 28, so it
+    // is something to hold yourself to rather than a drifting estimate.
+    const early = safeSpend(goalLed(), FX, new Date(2026, 7, 3, 12));
+    const late = safeSpend(goalLed(), FX, new Date(2026, 7, 28, 12));
+    expect(early.allowance).toBe(late.allowance);
+  });
+
+  it('gives the goal everything the plan does not spend', () => {
+    const c = safeSpend(goalLed(), FX, NOW);
+    // 11,000 pool − 60 × 31 living = 9,140 to the goal each month.
+    expect(c.goalReq).toBeCloseTo(11000 - 60 * 31, 6);
+    expect(c.plan?.monthlyToGoal).toBeCloseTo(9140, 6);
+  });
+
+  it('says where the goal lands rather than refusing the deadline', () => {
+    const c = safeSpend(goalLed(), FX, NOW);
+    expect(c.plan?.reachesTarget).toBe(false);
+    expect(c.plan?.projected).toBeGreaterThan(0);
+    expect(c.plan?.gap).toBeGreaterThan(0);
+    expect(c.plan?.target).toBe(1_100_000);
+  });
+
+  it('names the spend that would reach a target within reach', () => {
+    const c = safeSpend(goalLed({ goals: [{ ...egypt, target: 27_200, months: 2 }] }), FX, NOW);
+    expect(c.plan?.source).toBe('target');
+    expect(c.plan?.reachesTarget).toBe(true);
+    expect(c.plan?.dailyForTarget).toBeGreaterThan(60);
+    expect(c.allowance).toBe(c.plan?.dailyForTarget);
+  });
+
+  it('moves the landing figure with what is really spent', () => {
+    const onPlan = safeSpend(goalLed(), FX, NOW);
+    const overspent = safeSpend(
+      goalLed({ tx: [spend(4000, EARLIER, 'bank')] }),
+      FX,
+      NOW,
+    );
+    expect(overspent.planProjected).toBeLessThan(onPlan.planProjected ?? 0);
+    // The limit itself does not move — the consequence lands on the goal.
+    expect(overspent.allowance).toBe(onPlan.allowance);
+  });
+
+  it('falls back to the salary basis when no goal has a duration', () => {
+    const c = safeSpend(goalLed({ goals: [{ ...egypt, months: null }] }), FX, NOW);
+    expect(c.plan).toBeNull();
+    expect(c.allowance).toBeGreaterThan(0);
   });
 });

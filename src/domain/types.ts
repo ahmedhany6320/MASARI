@@ -300,7 +300,12 @@ export interface Ledger {
    *    salary has already landed and been partly spent: the balance is then a
    *    fact, and the salary is only there to say how long until the next one.
    *
+   *  - 'goal'    — the goal steers. The user fixes a duration, the daily
+   *    spend becomes the lever, and the goal is whatever that spending leaves
+   *    over. The daily figure is FIXED for the cycle rather than re-divided as
+   *    days pass, because the point is a number to hold yourself to.
+   *
    * Defaults to 'salary', which is what every existing save assumes.
    */
-  sslBasis?: 'salary' | 'balance';
+  sslBasis?: 'salary' | 'balance' | 'goal';
 }

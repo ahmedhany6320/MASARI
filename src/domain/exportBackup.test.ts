@@ -143,3 +143,12 @@ describe('summarizeBackup', () => {
     expect(s.sizeKb).toBeGreaterThan(text.length / 1024 / 2);
   });
 });
+
+describe('the goal basis survives a backup', () => {
+  const { ledger } = importBackup(real);
+
+  it('round-trips', () => {
+    const back = importBackup(buildBackup({ ...ledger, sslBasis: 'goal' }, SETTINGS, NOW));
+    expect(back.ledger.sslBasis).toBe('goal');
+  });
+});

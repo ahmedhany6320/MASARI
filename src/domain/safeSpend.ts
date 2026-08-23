@@ -3,6 +3,7 @@ import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPositi
 import { commitmentsDue, type CommitmentsDue } from './commitments';
 import { fundedGoals, fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
+import { projectAtPace, spendPlan, steeringGoal, type SpendPlan } from './spendPlan';
 import type { Goal, Ledger } from './types';
 
 export interface SafeSpend {
@@ -72,7 +73,17 @@ export interface SafeSpend {
   /** THE number: what is still safe to spend today. */
   ssl: number;
   /** Which basis produced the figures above. */
-  basis: 'salary' | 'balance';
+  basis: 'salary' | 'balance' | 'goal';
+  /**
+   * The goal-driven plan, when one steers. Present only on the 'goal' basis,
+   * where `allowance` comes from it rather than from dividing what is left.
+   */
+  plan: SpendPlan | null;
+  /**
+   * Where the steering goal lands at the pace ACTUALLY being spent, rather
+   * than the pace the plan assumed. In the goal's own currency.
+   */
+  planProjected: number | null;
   /** How far today has already run past its allowance. */
   overToday: number;
   /** What tomorrow looks like if today stops here. */
@@ -197,7 +208,31 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const poolBeforeGoal = basisPool - commitObl - planT - cardDue;
   const goals = fundedGoals(funding);
   const goalAsked = goalsMonthlyRequirement(goals, fx);
-  const goalReq = Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
+
+  /*
+   * On the goal basis the goal stops being a claim and becomes the residual:
+   * the plan fixes what may be spent per day, and everything the month does
+   * not spend goes to the goal. So `goalReq` is derived from the spending
+   * decision rather than competing with it.
+   */
+  const steering = s.sslBasis === 'goal' ? steeringGoal(goals) : null;
+  const plan =
+    steering != null
+      ? spendPlan(steering, {
+          poolBeforeGoal,
+          daysInMonth,
+          heldAed: steering.alloc,
+          floorDaily: Math.max(0, s.minDailySpend ?? 0),
+          fx,
+        })
+      : null;
+
+  const goalReq =
+    plan != null
+      ? plan.monthlyToGoal
+      : Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
+  // On the goal basis this reads as "how much less the goal gets than a
+  // target-driven schedule would have demanded" — the price of staying livable.
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
 
   const cycleSpend =
@@ -223,7 +258,8 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * Both then hand the same figure to the same divider below, so everything
    * downstream — allowance, overspend, tomorrow — is untouched by the choice.
    */
-  const basis: 'salary' | 'balance' = s.sslBasis === 'balance' ? 'balance' : 'salary';
+  const basis: 'salary' | 'balance' | 'goal' =
+    s.sslBasis === 'balance' ? 'balance' : s.sslBasis === 'goal' ? 'goal' : 'salary';
 
   const livingPool =
     basis === 'balance'
@@ -241,9 +277,24 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     .filter((x) => x.type === 'expense' && x.ts >= todayFrom)
     .reduce((a, x) => a + x.amt, 0);
 
-  // An overspent cycle yields no allowance at all rather than a negative one:
-  // the honest answer is "nothing is safe to spend", not a number to chase.
-  const allowance = spendable > 0 ? (spendable + flexToday) / daysLeft : 0;
+  /*
+   * On the goal basis the daily figure is the PLAN'S, held steady for the
+   * whole cycle. Dividing what is left by the days remaining — which is what
+   * the other bases do — produces a number that drifts every time anything
+   * else moves, and a commitment you cannot hold yourself to is not a
+   * commitment. Overspending here does not raise tomorrow's limit; it lowers
+   * where the goal lands, and `planProjected` says by how much.
+   *
+   * An overspent cycle on the other bases yields no allowance at all rather
+   * than a negative one: the honest answer is "nothing is safe to spend", not
+   * a number to chase.
+   */
+  const allowance =
+    plan != null
+      ? plan.dailyAllowance
+      : spendable > 0
+        ? (spendable + flexToday) / daysLeft
+        : 0;
   const ssl = Math.max(0, allowance - flexToday);
   const overToday = Math.max(0, flexToday - allowance);
   const tomorrow = Math.max(0, spendable) / Math.max(1, daysLeft - 1);
@@ -278,6 +329,11 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     allowance,
     ssl,
     basis,
+    plan,
+    planProjected:
+      plan != null && steering != null
+        ? projectAtPace(plan, steering, steering.alloc, cycleSpend, poolBeforeGoal, fx)
+        : null,
     overToday,
     tomorrow,
     daysLeft,

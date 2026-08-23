@@ -23,4 +23,5 @@ export * from './transfers';
 export * from './people';
 export * from './goalPlan';
 export * from './adaptive';
+export * from './spendPlan';
 export * from './defaults';

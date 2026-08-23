@@ -290,7 +290,8 @@ export function importBackup(raw: unknown): ImportResult {
     }
   }
 
-  led.sslBasis = d.sslBasis === 'balance' ? 'balance' : 'salary';
+  led.sslBasis =
+    d.sslBasis === 'balance' ? 'balance' : d.sslBasis === 'goal' ? 'goal' : 'salary';
 
   if (d.goalMode && typeof d.goalMode === 'object') {
     const modes: Record<string, 'fixed' | 'stretch' | 'horizon'> = {};

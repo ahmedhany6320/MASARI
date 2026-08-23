@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardClaimBreakdown } from '../../src/components/CardClaim';
+import { SpendPlanCard } from '../../src/components/SpendPlanCard';
 import { QuickAdd } from '../../src/components/QuickAdd';
 import { QuickAction } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import { formatShortDate } from '../../src/i18n';
 import { useLocalization, usePalette, useSafeSpend } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
+import { steeringGoal } from '../../src/domain';
 import { FONT, SPACE } from '../../src/theme/tokens';
 
 /**
@@ -29,6 +31,9 @@ export default function HomeScreen() {
   const [adding, setAdding] = useState(false);
 
   const ledger = useLedger((s) => s.ledger);
+  // The goal steering the plan, read from the engine's funded goals so its
+  // progress matches what the plan was built from.
+  const steeringGoalNow = steeringGoal(c.goals);
 
   // The limit is the headline, but an overspent day needs to say so plainly
   // rather than just showing zero.
@@ -47,6 +52,19 @@ export default function HomeScreen() {
           { paddingTop: insets.top + SPACE.lg, paddingBottom: SPACE.xxl },
         ]}
       >
+        {/*
+          On the goal basis the plan IS the answer, so it leads. The salary
+          breakdown below still explains where the pool came from, but the
+          number to act on is the plan's, not a residual.
+        */}
+        {c.plan != null && steeringGoalNow != null && (
+          <SpendPlanCard
+            plan={c.plan}
+            goal={steeringGoalNow}
+            projectedAtPace={c.planProjected}
+          />
+        )}
+
         <Card>
           <Caption>{t('ssl')}</Caption>
           <Text style={[styles.hero, { color: headlineColor, textAlign: rtl ? 'right' : 'left' }]}>
@@ -58,7 +76,13 @@ export default function HomeScreen() {
               {t('overLimit')} {money(c.overToday)}
             </Body>
           ) : (
-            <Caption>{c.basis === 'balance' ? t('basisBalanceHint') : t('sslDesc')}</Caption>
+            <Caption>
+              {c.basis === 'goal'
+                ? t('basisGoalHint')
+                : c.basis === 'balance'
+                  ? t('basisBalanceHint')
+                  : t('sslDesc')}
+            </Caption>
           )}
 
           <View style={{ marginTop: SPACE.md }}>

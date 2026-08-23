@@ -310,7 +310,8 @@ export async function pullLedger(): Promise<{ result: PulledLedger | null; error
       })),
       rules: {},
       savTarget: l.sav_target == null ? null : Number(l.sav_target),
-      sslBasis: l.ssl_basis === 'balance' ? 'balance' : 'salary',
+      sslBasis:
+        l.ssl_basis === 'balance' ? 'balance' : l.ssl_basis === 'goal' ? 'goal' : 'salary',
     };
 
     const prof = (profile.data ?? {}) as Record<string, unknown>;
