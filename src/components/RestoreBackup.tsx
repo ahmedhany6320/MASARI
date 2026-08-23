@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
-import { hasSeed, loadSeed, SEED_DATE } from '../data/seed';
 import { parseBackup, type ImportResult } from '../domain';
-import { formatShortDate } from '../i18n';
 import { useLocalization, usePalette } from '../store/selectors';
 import { useLedger } from '../store/useLedger';
 import { SPACE } from '../theme/tokens';
@@ -22,7 +20,7 @@ import { Body, Button, Caption, Card, Row, Title } from './ui';
  */
 export function RestoreBackup() {
   const p = usePalette();
-  const { t, num, lang } = useLocalization();
+  const { t, num } = useLocalization();
   const replaceAll = useLedger((s) => s.replaceAll);
 
   const [open, setOpen] = useState(false);
@@ -42,18 +40,6 @@ export function RestoreBackup() {
     setText('');
     setOpen(false);
     Alert.alert(t('restoreT'), doneMessage);
-  }
-
-  function useBundled() {
-    const res = loadSeed();
-    Alert.alert(
-      t('seedT'),
-      `${t('seedConfirm')}\n\n${t('navTx')}: ${num(res.counts.transactions)}`,
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('seedBtn'), onPress: () => applyResult(res, t('restoreDone')) },
-      ],
-    );
   }
 
   function check() {
@@ -88,19 +74,6 @@ export function RestoreBackup() {
       <Card>
         <Title>{t('restoreT')}</Title>
         <Caption>{t('restoreNote')}</Caption>
-
-        {hasSeed && (
-          <View style={{ marginTop: SPACE.md }}>
-            {/* The common case gets the primary button: the bundled backup is
-                already inside the app, so this is one tap with nothing to
-                copy, paste or find. */}
-            <Button label={t('seedBtn')} onPress={useBundled} />
-            <Caption style={{ marginTop: SPACE.sm }}>
-              {t('seedFrom')} {formatShortDate(SEED_DATE, lang)} · {num(loadSeed().counts.transactions)}{' '}
-              {t('navTx')}
-            </Caption>
-          </View>
-        )}
 
         <View style={{ marginTop: SPACE.md }}>
           <Button label={t('pasteBackup')} variant="secondary" onPress={() => setOpen(true)} />

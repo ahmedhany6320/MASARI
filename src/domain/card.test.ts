@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cardPosition } from './card';
+import { amortizedInstBal, cardClaim, cardPosition, monthsElapsed } from './card';
 import { emptyLedger } from './defaults';
-import type { Ledger, Tx } from './types';
+import type { CardSetup, Ledger, Tx } from './types';
 
 let seq = 0;
 function cardSpend(amt: number, post = true): Tx {
@@ -83,5 +83,54 @@ describe('cardPosition', () => {
     const cc = cardPosition(ledger({ tx: [cardSpend(1000), cardSpend(2000)] }));
     expect(cc.utilized).toBe(12000); // 5000 + (1000+3000) + 3000
     expect(cc.avail).toBe(8000);
+  });
+});
+
+describe('the installment balance pays itself down', () => {
+  const SETUP = new Date(2026, 1, 10).getTime();
+
+  function planned(over: Partial<CardSetup> = {}) {
+    return {
+      ...emptyLedger(),
+      cardCfg: { limit: 20000, closeDay: 1, dueDay: 25 },
+      cardSetup: { stmt0: 0, unbilled0: 0, instBal: 4800, instMo: 400, setupAt: SETUP, ...over },
+    };
+  }
+
+  it('counts only whole months that have come round', () => {
+    expect(monthsElapsed(SETUP, new Date(2026, 1, 10))).toBe(0);
+    expect(monthsElapsed(SETUP, new Date(2026, 2, 9))).toBe(0);
+    expect(monthsElapsed(SETUP, new Date(2026, 2, 10))).toBe(1);
+    expect(monthsElapsed(SETUP, new Date(2027, 1, 10))).toBe(12);
+  });
+
+  it('takes one charge off for each month elapsed', () => {
+    expect(cardPosition(planned(), new Date(2026, 1, 10)).instBal).toBe(4800);
+    expect(cardPosition(planned(), new Date(2026, 4, 10)).instBal).toBe(3600);
+    expect(cardPosition(planned(), new Date(2026, 7, 14)).instBal).toBe(2400);
+  });
+
+  it('stops at zero rather than going negative once the plan finishes', () => {
+    expect(cardPosition(planned(), new Date(2028, 0, 10)).instBal).toBe(0);
+  });
+
+  it('leaves an older setup with no date exactly as it was', () => {
+    // Amortising from an unknown start would invent a payment history.
+    const legacy = planned({ setupAt: null });
+    expect(cardPosition(legacy, new Date(2027, 5, 1)).instBal).toBe(4800);
+  });
+
+  it('does not amortise a plan with no declared monthly charge', () => {
+    const unknown = planned({ instMo: 0 });
+    expect(cardPosition(unknown, new Date(2027, 5, 1)).instBal).toBe(4800);
+  });
+
+  it('shrinks what the claim defers as the plan is paid down', () => {
+    const early = cardClaim(planned(), new Date(2026, 1, 1).getTime(), new Date(2026, 1, 10));
+    const later = cardClaim(planned(), new Date(2026, 7, 1).getTime(), new Date(2026, 7, 14));
+    expect(early.deferred).toBe(4400);
+    expect(later.deferred).toBe(2000);
+    // The monthly charge itself keeps being claimed either way.
+    expect(later.installment).toBe(400);
   });
 });

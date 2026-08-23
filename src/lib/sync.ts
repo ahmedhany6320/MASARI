@@ -80,7 +80,11 @@ export async function pushLedger(
       card_inst_bal: setup.instBal ?? null,
       card_inst_mo: setup.instMo ?? null,
       card_adj: ledger.cardAdj,
+      // Stamps the installment schedule's start; without it the plan balance
+      // cannot amortise and stays frozen at its opening figure.
+      card_setup_at: setup.setupAt != null ? new Date(setup.setupAt).toISOString() : null,
       sav_target: ledger.savTarget,
+      ssl_basis: ledger.sslBasis ?? 'salary',
     });
     if (lErr) throw lErr;
 
@@ -126,6 +130,7 @@ export async function pushLedger(
       due_day: k.day,
       paused: k.paused,
       paid_month: k.paidMonth,
+      paid_for: k.paidFor ?? null,
     }));
 
     const people = syncable(ledger.people);
@@ -249,6 +254,8 @@ export async function pullLedger(): Promise<{ result: PulledLedger | null; error
               unbilled0: num(l.card_unbilled0),
               instBal: num(l.card_inst_bal),
               instMo: num(l.card_inst_mo),
+              setupAt:
+                typeof l.card_setup_at === 'string' ? Date.parse(l.card_setup_at) : null,
             },
       cardAdj: num(l.card_adj),
       base: num(l.base_salary),
@@ -265,6 +272,7 @@ export async function pullLedger(): Promise<{ result: PulledLedger | null; error
         day: k.due_day == null ? null : Number(k.due_day),
         paused: Boolean(k.paused),
         paidMonth: Boolean(k.paid_month),
+        paidFor: typeof k.paid_for === 'string' ? k.paid_for : null,
       })),
       people: (people.data ?? []).map((p: Record<string, unknown>) => ({
         id: String(p.id),
@@ -302,6 +310,7 @@ export async function pullLedger(): Promise<{ result: PulledLedger | null; error
       })),
       rules: {},
       savTarget: l.sav_target == null ? null : Number(l.sav_target),
+      sslBasis: l.ssl_basis === 'balance' ? 'balance' : 'salary',
     };
 
     const prof = (profile.data ?? {}) as Record<string, unknown>;

@@ -68,6 +68,7 @@ export function buildBackup(
       baseline: ledger.baseline ?? null,
       minDailySpend: ledger.minDailySpend ?? null,
       goalMode: ledger.goalMode ?? {},
+      sslBasis: ledger.sslBasis ?? 'salary',
     },
   };
 }

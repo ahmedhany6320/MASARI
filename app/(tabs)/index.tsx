@@ -58,7 +58,7 @@ export default function HomeScreen() {
               {t('overLimit')} {money(c.overToday)}
             </Body>
           ) : (
-            <Caption>{t('sslDesc')}</Caption>
+            <Caption>{c.basis === 'balance' ? t('basisBalanceHint') : t('sslDesc')}</Caption>
           )}
 
           <View style={{ marginTop: SPACE.md }}>
@@ -81,8 +81,20 @@ export default function HomeScreen() {
 
               {/* Claims on the salary, largest structural ones first. */}
               <View style={{ marginTop: SPACE.sm }}>
-                <Row label={t('salaryWork')} value={money(ledger.base)} />
-                <Row label={t('upcoming')} value={`− ${money(c.commitObl)}`} />
+                <Row
+                  label={c.basis === 'balance' ? t('allocLiquid') : t('salaryWork')}
+                  value={money(c.basis === 'balance' ? c.liquid : ledger.base)}
+                />
+                <Row
+                  label={t('upcoming')}
+                  value={`− ${money(c.commitObl)}`}
+                  onPress={() => router.push('/(tabs)/plan')}
+                />
+                {c.commitments.needsConfirm > 0 && (
+                  <Caption style={{ color: p.warn, marginTop: SPACE.xs }}>
+                    {t('cmNeedsConfirm').replace('{n}', num(c.commitments.needsConfirm))}
+                  </Caption>
+                )}
                 <Row label={t('plannedTransfers')} value={`− ${money(c.planT)}`} />
                 <Row
                   label={t('cardDueLabel')}

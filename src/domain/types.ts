@@ -96,8 +96,17 @@ export interface Commitment {
   /** Day of month it falls due. */
   day: number | null;
   paused: boolean;
-  /** Cleared at the start of each cycle. */
+  /**
+   * Legacy paid flag with no cycle attached. Kept so old saves and backups
+   * still load; `paidFor` supersedes it and is what new writes set.
+   */
   paidMonth: boolean;
+  /**
+   * The cycle this was last marked paid for, as 'YYYY-MM'. Stamping the cycle
+   * is what makes the flag expire on its own — the bare boolean never did,
+   * so a bill ticked once stayed ticked forever and left the daily limit.
+   */
+  paidFor?: string | null;
 }
 
 /** `owe` = you owe them. `owed` = they owe you. */
@@ -168,6 +177,15 @@ export interface CardSetup {
   instBal?: number;
   /** Installment charge per month. */
   instMo?: number;
+  /**
+   * When these opening figures were declared.
+   *
+   * The installment balance is amortised forward from here: without a date
+   * there is nothing to measure elapsed months against, so the balance sat
+   * frozen at its opening figure forever while the user paid it down every
+   * month. Absent on older saves, which simply do not amortise.
+   */
+  setupAt?: number | null;
 }
 
 export interface OvertimeEntry {
@@ -271,4 +289,18 @@ export interface Ledger {
    * date move, `horizon` holds the date and lets the amount move.
    */
   goalMode?: Record<string, 'fixed' | 'stretch' | 'horizon'>;
+  /**
+   * What the daily limit is computed from.
+   *
+   *  - 'salary'  — the salary cycle: pool = salary − claims, less what has
+   *    been spent since the cycle began. Right when the month starts at
+   *    payday and the app has watched the whole cycle.
+   *  - 'balance' — the money actually held right now, less the claims still
+   *    to come. Right when starting part-way through a cycle, where the
+   *    salary has already landed and been partly spent: the balance is then a
+   *    fact, and the salary is only there to say how long until the next one.
+   *
+   * Defaults to 'salary', which is what every existing save assumes.
+   */
+  sslBasis?: 'salary' | 'balance';
 }

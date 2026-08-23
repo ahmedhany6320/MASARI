@@ -24,7 +24,34 @@ export interface CardPosition {
   out: number;
 }
 
-const EMPTY: Required<CardSetup> = { stmt0: 0, unbilled0: 0, instBal: 0, instMo: 0 };
+const EMPTY: Required<CardSetup> = {
+  stmt0: 0, unbilled0: 0, instBal: 0, instMo: 0, setupAt: null,
+};
+
+/**
+ * Whole months elapsed between two instants, by calendar month rather than by
+ * dividing days — an installment is charged on a date, not every 30.4 days.
+ */
+export function monthsElapsed(from: number, now: Date): number {
+  const a = new Date(from);
+  let months = (now.getFullYear() - a.getFullYear()) * 12 + (now.getMonth() - a.getMonth());
+  // The month only counts once its day-of-month has come round again.
+  if (now.getDate() < a.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
+/**
+ * The installment balance as it stands today.
+ *
+ * The opening figure is what was owed at setup; every month since has taken
+ * one monthly charge off it. Leaving it static meant the app showed the same
+ * plan balance in month one and month twelve, so paying it down never showed
+ * up anywhere — and the "deferred" figure stayed permanently overstated.
+ */
+export function amortizedInstBal(st: Required<CardSetup>, now: Date): number {
+  if (st.setupAt == null || st.instMo <= 0) return st.instBal;
+  return Math.max(0, st.instBal - st.instMo * monthsElapsed(st.setupAt, now));
+}
 
 /**
  * Reconstructs the credit-card position from the opening setup plus the
@@ -37,9 +64,11 @@ const EMPTY: Required<CardSetup> = { stmt0: 0, unbilled0: 0, instBal: 0, instMo:
  */
 export function cardPosition(
   s: Pick<Ledger, 'cardSetup' | 'cardAdj' | 'cardCfg' | 'tx'>,
+  now: Date = new Date(),
 ): CardPosition {
   const st = { ...EMPTY, ...(s.cardSetup ?? {}) };
-  const { stmt0, unbilled0, instBal, instMo } = st;
+  const { stmt0, unbilled0, instMo } = st;
+  const instBal = amortizedInstBal(st, now);
 
   let purch = 0;
   let paid = 0;
@@ -104,8 +133,9 @@ export interface CardCarryover {
 export function cardCarryover(
   s: Pick<Ledger, 'cardSetup' | 'cardAdj' | 'cardCfg' | 'tx'>,
   from: number,
+  now: Date = new Date(),
 ): CardCarryover {
-  const { unbilled } = cardPosition(s);
+  const { unbilled } = cardPosition(s, now);
   const spentOnCard = s.tx
     .filter((x) => posts(x) && x.type === 'expense' && x.acct === 'card' && x.ts >= from)
     .reduce((a, x) => a + x.amt, 0);
@@ -168,9 +198,10 @@ export interface CardClaim {
 export function cardClaim(
   s: Pick<Ledger, 'cardSetup' | 'cardAdj' | 'cardCfg' | 'tx'>,
   cycleFrom: number,
+  now: Date = new Date(),
 ): CardClaim {
-  const cc = cardPosition(s);
-  const { unbilledCycle, unbilledCarried } = cardCarryover(s, cycleFrom);
+  const cc = cardPosition(s, now);
+  const { unbilledCycle, unbilledCarried } = cardCarryover(s, cycleFrom, now);
 
   const due = cc.stmtRem + cc.instMo + unbilledCarried;
   const deferred = Math.max(0, cc.instBal - cc.instMo);

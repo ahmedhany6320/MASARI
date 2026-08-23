@@ -100,6 +100,7 @@ export function importBackup(raw: unknown): ImportResult {
       unbilled0: num(cs.unbilled0, 0) ?? 0,
       instBal: num(cs.instBal, 0) ?? 0,
       instMo: num(cs.instMo, 0) ?? 0,
+      setupAt: num(cs.setupAt),
     };
   }
   led.cardAdj = num(d.cardAdj, 0) ?? 0;
@@ -139,6 +140,7 @@ export function importBackup(raw: unknown): ImportResult {
         day: num(k.day),
         paused: bool(k.paused),
         paidMonth: bool(k.paidMonth),
+        paidFor: typeof k.paidFor === 'string' ? k.paidFor : null,
       });
     }
     led.commits = out;
@@ -287,6 +289,8 @@ export function importBackup(raw: unknown): ImportResult {
       led.baseline = { ts, cycleSpentBefore: num(b.cycleSpentBefore, 0) ?? 0 };
     }
   }
+
+  led.sslBasis = d.sslBasis === 'balance' ? 'balance' : 'salary';
 
   if (d.goalMode && typeof d.goalMode === 'object') {
     const modes: Record<string, 'fixed' | 'stretch' | 'horizon'> = {};

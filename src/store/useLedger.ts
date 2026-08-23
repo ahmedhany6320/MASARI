@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { uuid } from '../lib/id';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
+  cycleKey,
   DEFAULT_FX_RATE,
   emptyLedger,
   type Account,
@@ -70,6 +71,8 @@ export interface LedgerStore {
 
   addCommitment: (c: Omit<Commitment, 'id'>) => void;
   updateCommitment: (id: string, patch: Partial<Commitment>) => void;
+  /** Mark a commitment settled (or not) FOR THE CURRENT CYCLE. */
+  setCommitmentPaid: (id: string, paid: boolean) => void;
   removeCommitment: (id: string) => void;
 
   addGoal: (g: Omit<Goal, 'id'>) => void;
@@ -129,6 +132,8 @@ export interface LedgerStore {
   setMinDailySpend: (amount: number | null) => void;
   /** How a goal is pursued: fixed amount+date, stretch the date, or fix the date. */
   setGoalMode: (goalId: string, mode: 'fixed' | 'stretch' | 'horizon') => void;
+  /** Choose whether the daily limit is sized from the salary or the balance. */
+  setSslBasis: (basis: 'salary' | 'balance') => void;
 
   addCategory: (ar: string, en: string) => void;
   removeCategory: (id: string) => void;
@@ -222,6 +227,25 @@ export const useLedger = create<LedgerStore>()(
 
       addCommitment: (c) =>
         set((s) => ({ ledger: { ...s.ledger, commits: [...s.ledger.commits, { ...c, id: newId() }] } })),
+      setCommitmentPaid: (id, paid) =>
+        set((st) => ({
+          ledger: {
+            ...st.ledger,
+            commits: st.ledger.commits.map((k) =>
+              k.id === id
+                ? {
+                    ...k,
+                    // Stamping the cycle is what lets the flag expire by
+                    // itself; `paidMonth` is kept in step only so an older
+                    // build reading this save still sees something sensible.
+                    paidFor: paid ? cycleKey(new Date()) : null,
+                    paidMonth: paid,
+                  }
+                : k,
+            ),
+          },
+        })),
+
       updateCommitment: (id, patch) =>
         set((s) => ({
           ledger: {
@@ -322,7 +346,16 @@ export const useLedger = create<LedgerStore>()(
         set((s) => ({ ledger: { ...s.ledger, otEntries: s.ledger.otEntries.filter((e) => e.id !== id) } })),
 
       // ---- card -----------------------------------------------------------
-      setCardSetup: (cardSetup) => set((s) => ({ ledger: { ...s.ledger, cardSetup } })),
+      setCardSetup: (cardSetup) =>
+        set((s) => ({
+          ledger: {
+            ...s.ledger,
+            // Stamped on save so the installment plan can amortise from a
+            // known start. Without it the balance stays frozen at its opening
+            // figure however many months are paid.
+            cardSetup: cardSetup ? { ...cardSetup, setupAt: Date.now() } : null,
+          },
+        })),
       setCardConfig: (cfg) =>
         set((s) => ({ ledger: { ...s.ledger, cardCfg: { ...s.ledger.cardCfg, ...cfg } } })),
 
@@ -353,6 +386,8 @@ export const useLedger = create<LedgerStore>()(
             minDailySpend: minDailySpend != null && minDailySpend > 0 ? minDailySpend : null,
           },
         })),
+
+      setSslBasis: (sslBasis) => set((st) => ({ ledger: { ...st.ledger, sslBasis } })),
 
       setGoalMode: (goalId, mode) =>
         set((s) => ({

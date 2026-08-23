@@ -1,3 +1,4 @@
+import { isPaidFor } from './commitments';
 import { formatAmount } from './money';
 import type { SafeSpend } from './safeSpend';
 import type { Commitment, Lang, Ledger } from './types';
@@ -103,7 +104,7 @@ export function dueCommitments(
   const today = now.getDate();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   return ledger.commits.filter((k) => {
-    if (k.paused || k.paidMonth || !k.day || !k.amt) return false;
+    if (k.paused || isPaidFor(k, now) || !k.day || !k.amt) return false;
     // Wraps across the month boundary, so a bill due on the 2nd still warns
     // from the 30th.
     const delta = (k.day - today + daysInMonth) % daysInMonth;

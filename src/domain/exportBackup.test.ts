@@ -87,6 +87,29 @@ describe('buildBackup', () => {
     expect(back.ledger.goalMode).toEqual({});
   });
 
+  it('round-trips the scheduling fields', () => {
+    const withSched = {
+      ...ledger,
+      sslBasis: 'balance' as const,
+      cardSetup: { stmt0: 100, unbilled0: 50, instBal: 2400, instMo: 400, setupAt: 1750000000000 },
+      commits: [
+        { id: 'k1', ar: 'إيجار', en: 'Rent', amt: 3000, day: 5, paused: false, paidMonth: true, paidFor: '2026-08' },
+      ],
+    };
+    const back = importBackup(buildBackup(withSched, SETTINGS, NOW));
+    expect(back.ledger.sslBasis).toBe('balance');
+    expect(back.ledger.cardSetup?.setupAt).toBe(1750000000000);
+    expect(back.ledger.commits[0]?.paidFor).toBe('2026-08');
+  });
+
+  it('falls back to the salary basis for a backup that predates the choice', () => {
+    expect(importBackup(real).ledger.sslBasis).toBe('salary');
+  });
+
+  it('rejects a basis it does not recognise rather than storing it', () => {
+    expect(importBackup({ data: { sslBasis: 'vibes' } }).ledger.sslBasis).toBe('salary');
+  });
+
   it('ignores a goal mode it does not recognise', () => {
     const back = importBackup({ data: { goalMode: { g1: 'nonsense', g2: 'horizon' } } });
     expect(back.ledger.goalMode).toEqual({ g2: 'horizon' });

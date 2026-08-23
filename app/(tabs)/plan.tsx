@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, DayPicker, Sheet, TextField } from '../../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import {
+  allocationCheck,
+  commitmentsDue,
   debtSummary,
   formatEgp,
   goalMonthlyRequirement,
@@ -13,6 +15,7 @@ import {
   personHistory,
   repaidRatio,
   type Account,
+  type CommitState,
   type DebtDirection,
 } from '../../src/domain';
 import { formatShortDate } from '../../src/i18n';
@@ -41,6 +44,7 @@ export default function PlanScreen() {
 
   const addCommitment = useLedger((s) => s.addCommitment);
   const updateCommitment = useLedger((s) => s.updateCommitment);
+  const setCommitmentPaid = useLedger((s) => s.setCommitmentPaid);
   const removeCommitment = useLedger((s) => s.removeCommitment);
   const addPerson = useLedger((s) => s.addPerson);
   const removePerson = useLedger((s) => s.removePerson);
@@ -195,6 +199,39 @@ export default function PlanScreen() {
     }
   };
 
+  /*
+   * Commitments are read through the scheduler rather than off the raw list,
+   * so this screen and the daily limit can never disagree about which ones
+   * are still owed.
+   */
+  const due = useMemo(() => commitmentsDue(ledger.commits, new Date()), [ledger.commits]);
+  const commitStates = due.items;
+
+  // Bank plus cash only. Card headroom is credit, and a goal "funded" by a
+  // credit limit is not funded.
+  const alloc = useMemo(
+    () => allocationCheck(ledger.goals, c.liquid),
+    [ledger.goals, c.liquid],
+  );
+
+  function commitLabel(state: CommitState, daysAway: number | null, day: number | null): string {
+    if (state === 'paused') return t('cmPaused');
+    if (state === 'paid') return t('cmPaidThis');
+    if (state === 'incomplete') return t('cmIncomplete');
+    const on = day != null ? `${t('cmDue')} ${num(day)} · ` : '';
+    if (state === 'today') return `${on}${t('cmToday')}`;
+    if (state === 'overdue') return `${on}${t('cmOverdue').replace('{n}', num(Math.abs(daysAway ?? 0)))}`;
+    return `${on}${t('cmInDays').replace('{n}', num(daysAway ?? 0))}`;
+  }
+
+  function askIfPaid(id: string, name: string) {
+    Alert.alert(`${name} — ${t('cmConfirmT')}`, t('cmConfirmB'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('cmNotPaid') },
+      { text: t('cmWasPaid'), onPress: () => setCommitmentPaid(id, true) },
+    ]);
+  }
+
   return (
     <Screen>
       <ScrollView
@@ -232,23 +269,60 @@ export default function PlanScreen() {
             <Title>{t('segCommit')}</Title>
             <Caption>{t('commitNote')}</Caption>
 
+            {ledger.commits.length > 0 && (
+              <View style={{ marginTop: SPACE.md }}>
+                {due.overdue > 0 && (
+                  <Row label={t('cmOverdueSum')} value={money(due.overdue)} valueColor={p.negative} />
+                )}
+                {due.upcoming > 0 && (
+                  <Row label={t('cmUpcomingSum')} value={money(due.upcoming)} valueColor={p.ink} />
+                )}
+                {due.paid > 0 && (
+                  <Row label={t('cmPaidSum')} value={money(due.paid)} valueColor={p.positive} />
+                )}
+                <Row label={t('total')} value={money(due.total)} valueColor={p.accentDeep} />
+                <Caption style={{ marginTop: SPACE.xs }}>{t('cmResetNote')}</Caption>
+              </View>
+            )}
+
             {ledger.commits.length === 0 ? (
               <Body muted style={{ marginTop: SPACE.lg }}>{t('upcomingEmpty')}</Body>
             ) : (
               <View style={{ marginTop: SPACE.sm }}>
-                {ledger.commits.map((k) => (
+                {commitStates.map(({ commit: k, state, daysAway, claims }) => (
                   <View key={k.id} style={{ marginBottom: SPACE.md }}>
                     <Row
-                      label={`${k[lang]}${k.day ? ` · ${t('dayOfMonth')} ${k.day}` : ''}`}
+                      label={k[lang]}
                       value={k.amt != null ? money(k.amt) : t('enterAmount')}
-                      valueColor={k.paused || k.paidMonth ? p.sub : p.ink}
+                      valueColor={claims ? p.ink : p.sub}
                       onPress={() => openSheet({ kind: 'commit', id: k.id })}
                     />
+                    {/* The exact standing, in words: a bare day number does not
+                        say whether it has already passed. */}
+                    <Caption
+                      style={{
+                        color:
+                          state === 'overdue' ? p.negative : state === 'today' ? p.warn : p.sub,
+                      }}
+                    >
+                      {commitLabel(state, daysAway, k.day)}
+                    </Caption>
+                    {/* Deducted to be safe, but the app says it is guessing
+                        and offers the one tap that settles it. */}
+                    {state === 'overdue' && (
+                      <View style={{ marginTop: SPACE.xs }}>
+                        <Button
+                          label={t('cmConfirmT')}
+                          variant="secondary"
+                          onPress={() => askIfPaid(k.id, k[lang])}
+                        />
+                      </View>
+                    )}
                     <View style={[styles.actions, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
                       <Button
-                        label={k.paidMonth ? t('markUnpaid') : t('payNow')}
+                        label={state === 'paid' ? t('markUnpaid') : t('payNow')}
                         variant="secondary"
-                        onPress={() => updateCommitment(k.id, { paidMonth: !k.paidMonth })}
+                        onPress={() => setCommitmentPaid(k.id, state !== 'paid')}
                       />
                       <Button
                         label={k.paused ? t('resume') : t('pause')}
@@ -398,6 +472,42 @@ export default function PlanScreen() {
             <Title>{t('goals')}</Title>
             <Caption>{t('goalNote')}</Caption>
 
+            {/*
+              An allocation is a claim on money that has to actually exist.
+              Shown before the goals themselves, because a list of well-funded
+              goals backed by an empty account is the one reading worth
+              catching first.
+            */}
+            {ledger.goals.length > 0 && (
+              <View style={{ marginTop: SPACE.md }}>
+                <Caption>{t('allocNote')}</Caption>
+                <View style={{ marginTop: SPACE.sm }}>
+                  <Row label={t('allocTotal')} value={money(alloc.allocated)} />
+                  <Row label={t('allocLiquid')} value={money(alloc.liquid)} />
+                  {alloc.overAllocated ? (
+                    <Row
+                      label={t('allocUnbacked')}
+                      value={money(alloc.unbacked)}
+                      valueColor={p.negative}
+                    />
+                  ) : (
+                    <Row label={t('allocFree')} value={money(alloc.free)} valueColor={p.positive} />
+                  )}
+                </View>
+                <View style={{ marginTop: SPACE.sm }}>
+                  <Meter
+                    ratio={alloc.ratio}
+                    color={alloc.overAllocated ? p.negative : p.accent}
+                  />
+                </View>
+                {alloc.overAllocated && (
+                  <Caption style={{ color: p.warn, marginTop: SPACE.sm }}>
+                    {t('allocOverB')}
+                  </Caption>
+                )}
+              </View>
+            )}
+
             {ledger.goals.length === 0 ? (
               <Body muted style={{ marginTop: SPACE.lg }}>{t('goalsEmpty')}</Body>
             ) : (
@@ -409,6 +519,7 @@ export default function PlanScreen() {
                   const held = egp ? g.alloc * fxRate + (g.extEgp ?? 0) : g.alloc;
                   const ratio = g.target ? held / g.target : 0;
                   const perMonth = goalMonthlyRequirement(g, fxRate);
+                  const cover = alloc.perGoal.find((x) => x.goal.id === g.id);
                   const fmt = (n: number) => (egp ? formatEgp(n, lang) : money(n));
                   return (
                     <View key={g.id} style={{ marginBottom: SPACE.lg }}>
@@ -423,6 +534,12 @@ export default function PlanScreen() {
                           ? `${money(perMonth)} / ${t('monthsW')} · ${num(g.months ?? 0)} ${t('monthsW')}`
                           : t('goalNoSchedule')}
                       </Caption>
+                      {cover != null && cover.unbacked > 0 && (
+                        <Caption style={{ color: p.negative }}>
+                          {t('allocShort')} {money(cover.unbacked)} · {t('allocBacked')}{' '}
+                          {money(cover.backed)}
+                        </Caption>
+                      )}
                       <View style={[styles.actions, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
                         <Button
                           label={t('del')}

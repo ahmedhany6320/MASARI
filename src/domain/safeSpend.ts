@@ -1,5 +1,6 @@
 import { bankBalance, cashBalance } from './balances';
 import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPosition } from './card';
+import { commitmentsDue, type CommitmentsDue } from './commitments';
 import { goalsMonthlyRequirement } from './goals';
 import type { Ledger } from './types';
 
@@ -10,8 +11,10 @@ export interface SafeSpend {
   liquid: number;
   /** Already earmarked for goals. */
   protectedAlloc: number;
-  /** Unpaid, unpaused commitments this cycle. */
+  /** Commitments still owed this cycle, after date and paid-status checks. */
   commitObl: number;
+  /** Every commitment's standing this cycle: due date, state, what it claims. */
+  commitments: CommitmentsDue;
   /** Everything the card will demand: statement + unbilled + this month's installment. */
   cardObl: number;
   /**
@@ -65,6 +68,8 @@ export interface SafeSpend {
   allowance: number;
   /** THE number: what is still safe to spend today. */
   ssl: number;
+  /** Which basis produced the figures above. */
+  basis: 'salary' | 'balance';
   /** How far today has already run past its allowance. */
   overToday: number;
   /** What tomorrow looks like if today stops here. */
@@ -117,9 +122,14 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const liquid = bank + (cash ?? 0);
 
   const protectedAlloc = s.goals.reduce((a, g) => a + g.alloc, 0);
-  const commitObl = s.commits
-    .filter((c) => !c.paused && !c.paidMonth && (c.amt ?? 0) > 0)
-    .reduce((a, c) => a + (c.amt ?? 0), 0);
+  /*
+   * Commitments are scheduled rather than summed. The old filter deducted
+   * every unpaid one regardless of date, and trusted a `paidMonth` flag that
+   * nothing ever cleared — so a bill ticked once left the daily limit
+   * permanently. `commitmentsDue` re-decides both every cycle.
+   */
+  const commitments = commitmentsDue(s.commits, now);
+  const commitObl = commitments.total;
 
   /*
    * A baseline set during THIS cycle means the user declared their real
@@ -133,9 +143,9 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const spentBefore = baseTs != null ? (s.baseline?.cycleSpentBefore ?? 0) : 0;
   const countFrom = baseTs != null ? Math.max(monthStart, baseTs) : monthStart;
 
-  const cc = cardPosition(s);
+  const cc = cardPosition(s, now);
   const cardObl = cc.stmtRem + cc.unbilled + cc.instMo;
-  const carry = cardCarryover(s, countFrom);
+  const carry = cardCarryover(s, countFrom, now);
 
   /*
    * What the card claims from THIS month's salary.
@@ -174,7 +184,8 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    */
   const daysInMonth = new Date(Y, M + 1, 0).getDate();
   const floorMonthly = Math.max(0, s.minDailySpend ?? 0) * daysInMonth;
-  const poolBeforeGoal = s.base - commitObl - planT - cardDue;
+  const basisPool = s.sslBasis === 'balance' ? bank + (cash ?? 0) : s.base;
+  const poolBeforeGoal = basisPool - commitObl - planT - cardDue;
   const goalAsked = goalsMonthlyRequirement(s.goals, fx);
   const goalReq = Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
@@ -185,8 +196,34 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
       .filter((x) => x.type === 'expense' && x.ts >= countFrom)
       .reduce((a, x) => a + x.amt, 0);
 
-  const livingPool = s.base - commitObl - planT - goalReq - cardDue;
-  const spendable = livingPool - cycleSpend;
+  /*
+   * Two ways to size the pool, and the right one depends on what the app
+   * actually knows.
+   *
+   * On the SALARY basis the pool is the salary less every claim, and spending
+   * so far this cycle is then subtracted. That needs the app to have seen the
+   * whole cycle; start it on the 14th and it hands back a full month's budget
+   * for a salary that is already half spent.
+   *
+   * On the BALANCE basis the money in hand IS the answer. It is a measured
+   * fact rather than a reconstruction, so nothing needs subtracting for
+   * history — what was spent is already missing from the balance. The salary
+   * still matters, but only for saying when the next one arrives.
+   *
+   * Both then hand the same figure to the same divider below, so everything
+   * downstream — allowance, overspend, tomorrow — is untouched by the choice.
+   */
+  const basis: 'salary' | 'balance' = s.sslBasis === 'balance' ? 'balance' : 'salary';
+
+  const livingPool =
+    basis === 'balance'
+      ? liquid - commitObl - planT - goalReq - cardDue
+      : s.base - commitObl - planT - goalReq - cardDue;
+
+  // Card spending does not touch the balance until the card is settled, and
+  // that settlement is already deducted as `cardDue` — so on the balance basis
+  // only the card spending of this cycle still needs charging.
+  const spendable = basis === 'balance' ? livingPool - carry.unbilledCycle : livingPool - cycleSpend;
 
   // Today's spending is likewise counted only from the baseline forward.
   const todayFrom = baseTs != null ? Math.max(dayStart, baseTs) : dayStart;
@@ -207,6 +244,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     liquid,
     protectedAlloc,
     commitObl,
+    commitments,
     cardObl,
     cardDue,
     cardDueParts: {
@@ -215,7 +253,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
       carried: carry.unbilledCarried,
     },
     cardCycleUnbilled: carry.unbilledCycle,
-    cardClaim: cardClaim(s, countFrom),
+    cardClaim: cardClaim(s, countFrom, now),
     cardNextBill: cc.unbilled + cc.instMo,
     planT,
     goalReq,
@@ -228,6 +266,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     flexToday,
     allowance,
     ssl,
+    basis,
     overToday,
     tomorrow,
     daysLeft,

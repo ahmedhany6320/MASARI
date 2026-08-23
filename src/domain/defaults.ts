@@ -71,5 +71,6 @@ export function emptyLedger(makeId: () => string = defaultId): Ledger {
     minDailySpend: null,
     baseline: null,
     goalMode: {},
+    sslBasis: 'salary',
   };
 }

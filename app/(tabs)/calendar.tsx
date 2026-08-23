@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Body, Caption, Card, Row, Screen, Title } from '../../src/components/ui';
+import { isPaidFor } from '../../src/domain';
 import { MONTHS } from '../../src/i18n';
 import { useLocalization, usePalette } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
@@ -52,7 +53,7 @@ export default function CalendarScreen() {
       acc.set(day, list);
     };
     for (const k of ledger.commits) {
-      if (k.paused || k.paidMonth) continue;
+      if (k.paused || isPaidFor(k, new Date())) continue;
       push(k.day, k[lang], k.amt ?? 0);
     }
     for (const tf of ledger.planTf) push(tf.day, t('plannedTransfers'), tf.amt);

@@ -39,6 +39,8 @@ export default function MoreScreen() {
   const setTheme = useLedger((s) => s.setTheme);
   const setBiometricLock = useLedger((s) => s.setBiometricLock);
   const reset = useLedger((s) => s.reset);
+  const setSslBasis = useLedger((s) => s.setSslBasis);
+  const basis = useLedger((s) => s.ledger.sslBasis ?? 'salary');
 
   // Expected money still outstanding: receivables plus anything lent out.
   const pendingRecv =
@@ -203,6 +205,29 @@ export default function MoreScreen() {
               />
             </View>
             <Caption>{t('biometricHint')}</Caption>
+          </View>
+        </Card>
+
+        {/*
+          The single most consequential setting in the app: it changes what
+          the daily limit is derived from. Both options are correct in their
+          own situation, so it explains rather than defaults silently.
+        */}
+        <Card>
+          <Title>{t('basisT')}</Title>
+          <View style={{ marginTop: SPACE.md, gap: SPACE.sm }}>
+            <Button
+              label={t('basisSalary')}
+              variant={basis === 'salary' ? 'primary' : 'secondary'}
+              onPress={() => setSslBasis('salary')}
+            />
+            <Caption>{t('basisSalaryNote')}</Caption>
+            <Button
+              label={t('basisBalance')}
+              variant={basis === 'balance' ? 'primary' : 'secondary'}
+              onPress={() => setSslBasis('balance')}
+            />
+            <Caption>{t('basisBalanceNote')}</Caption>
           </View>
         </Card>
 

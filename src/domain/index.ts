@@ -10,6 +10,8 @@ export * from './types';
 export * from './money';
 export * from './balances';
 export * from './card';
+export * from './commitments';
+export * from './allocation';
 export * from './goals';
 export * from './overtime';
 export * from './safeSpend';
