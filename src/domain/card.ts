@@ -41,16 +41,43 @@ export function monthsElapsed(from: number, now: Date): number {
 }
 
 /**
+ * How much of the installment plan has been BILLED so far.
+ *
+ * A plan charges one installment per month, so time governs what can be
+ * demanded — but never what has been settled. Without a setup date there is no
+ * elapsed time to measure, so the whole plan is treated as billable and
+ * payment alone decides.
+ */
+export function instBilled(st: Required<CardSetup>, now: Date): number {
+  if (st.instMo <= 0) return 0;
+  if (st.setupAt == null) return st.instBal;
+  // The month of setup carries a charge of its own, hence the +1.
+  return Math.min(st.instBal, st.instMo * (monthsElapsed(st.setupAt, now) + 1));
+}
+
+/**
  * The installment balance as it stands today.
  *
- * The opening figure is what was owed at setup; every month since has taken
- * one monthly charge off it. Leaving it static meant the app showed the same
- * plan balance in month one and month twelve, so paying it down never showed
- * up anywhere — and the "deferred" figure stayed permanently overstated.
+ * Two wrong answers were rejected on the way here. Leaving the figure static —
+ * as it was originally — showed the same plan balance in month one and month
+ * twelve, so paying it down never appeared anywhere. Amortising purely by
+ * elapsed months was no better: it retires installments for someone who has
+ * paid nothing, which is precisely backwards for an app whose job is to say
+ * what is still owed.
+ *
+ * So the plan comes down only when it is PAID. Payments settle the issued
+ * statement first, then the installments billed to date, and anything beyond
+ * that reduces unbilled spending — the order a card bill is actually presented
+ * in, and the order the user described.
  */
-export function amortizedInstBal(st: Required<CardSetup>, now: Date): number {
-  if (st.setupAt == null || st.instMo <= 0) return st.instBal;
-  return Math.max(0, st.instBal - st.instMo * monthsElapsed(st.setupAt, now));
+export function instPaidOff(st: Required<CardSetup>, paid: number, now: Date): number {
+  const beyondStatement = Math.max(0, paid - st.stmt0);
+  return Math.min(instBilled(st, now), beyondStatement);
+}
+
+export function amortizedInstBal(st: Required<CardSetup>, paid: number, now: Date): number {
+  if (st.instMo <= 0) return st.instBal;
+  return Math.max(0, st.instBal - instPaidOff(st, paid, now));
 }
 
 /**
@@ -68,7 +95,6 @@ export function cardPosition(
 ): CardPosition {
   const st = { ...EMPTY, ...(s.cardSetup ?? {}) };
   const { stmt0, unbilled0, instMo } = st;
-  const instBal = amortizedInstBal(st, now);
 
   let purch = 0;
   let paid = 0;
@@ -84,7 +110,16 @@ export function cardPosition(
   }
 
   const stmtRem = Math.max(0, stmt0 - paid);
-  const leftover = Math.max(0, paid - stmt0);
+
+  /*
+   * The payment waterfall: statement, then the installments billed so far,
+   * then unbilled spending. Only what survives all three reduces the running
+   * balance, so an ordinary monthly payment retires an installment instead of
+   * silently shrinking unbilled spending it was never meant to cover.
+   */
+  const instPaid = instPaidOff(st, paid, now);
+  const instBal = Math.max(0, st.instBal - instPaid);
+  const leftover = Math.max(0, paid - stmt0 - instPaid);
   const unbilled = Math.max(0, unbilled0 + purch + s.cardAdj - leftover);
   const utilized = stmtRem + unbilled + instBal;
 
@@ -171,6 +206,16 @@ export interface CardClaim {
   /** Installment balance beyond this month's charge, spread over later months. */
   deferred: number;
   /**
+   * The bill standing right now: the issued statement plus this month's
+   * installment. What settling the card today would cost.
+   */
+  billNow: number;
+  /**
+   * What the card will bill next: everything unbilled so far, plus the
+   * installment that keeps running.
+   */
+  billNext: number;
+  /**
    * True when an installment balance exists but no monthly charge was ever
    * declared. The plan then defers the WHOLE balance with no schedule behind
    * it — the one way the card can still hold money this app cannot see.
@@ -215,6 +260,8 @@ export function cardClaim(
     installmentBalance: cc.instBal,
     deferred,
     installmentUnknown: cc.instBal > 0 && cc.instMo <= 0,
+    billNow: cc.stmtRem + cc.instMo,
+    billNext: cc.unbilled + cc.instMo,
     totalOwed: cc.stmtRem + cc.unbilled + cc.instBal,
     chargedThisMonth: due + unbilledCycle,
   };

@@ -143,11 +143,11 @@ export default function HomeScreen() {
                 <Row label={t('daysLeftLabel')} value={`÷ ${num(c.daysLeft)}`} />
               </View>
 
-              {c.cardNextBill > 0 && (
+              {c.cardClaim.billNext > 0 && (
                 <View style={{ marginTop: SPACE.lg }}>
                   <Row
                     label={t('cardNextBillL')}
-                    value={money(c.cardNextBill)}
+                    value={money(c.cardClaim.billNext)}
                     valueColor={p.warn}
                   />
                   <Caption style={{ marginTop: SPACE.xs }}>{t('cardNextBillNote')}</Caption>

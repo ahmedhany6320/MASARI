@@ -11,7 +11,7 @@ export * from './money';
 export * from './balances';
 export * from './card';
 export * from './commitments';
-export * from './allocation';
+export * from './funding';
 export * from './goals';
 export * from './overtime';
 export * from './safeSpend';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amortizedInstBal, cardClaim, cardPosition, monthsElapsed } from './card';
+import { cardClaim, cardPosition, instBilled, monthsElapsed } from './card';
 import { emptyLedger } from './defaults';
 import type { CardSetup, Ledger, Tx } from './types';
 
@@ -45,12 +45,30 @@ describe('cardPosition', () => {
     expect(cc.paidThisStmt).toBe(2000);
   });
 
-  it('spills only the leftover onto unbilled once the statement is cleared', () => {
-    // 5000 clears the statement exactly; the extra 600 eats into unbilled.
+  it('sends what clears the statement to the installments next', () => {
+    // 5,000 clears the statement exactly; the extra 600 goes to the plan,
+    // which is the next thing the bill actually asks for.
     const cc = cardPosition(ledger({ tx: [pay(5600)] }));
     expect(cc.stmtRem).toBe(0);
+    expect(cc.instBal).toBe(2400);
+    expect(cc.unbilled).toBe(1000);
+  });
+
+  it('reaches unbilled once the statement and the plan are both settled', () => {
+    // 5,000 statement + 3,000 plan = 8,000; the last 600 eats into unbilled.
+    const cc = cardPosition(ledger({ tx: [pay(8600)] }));
+    expect(cc.stmtRem).toBe(0);
+    expect(cc.instBal).toBe(0);
     expect(cc.unbilled).toBe(400);
     expect(cc.out).toBe(400);
+  });
+
+  it('spills straight onto unbilled when there is no plan in the way', () => {
+    const noPlan = ledger({
+      cardSetup: { stmt0: 5000, unbilled0: 1000, instBal: 0, instMo: 0 },
+      tx: [pay(5600)],
+    });
+    expect(cardPosition(noPlan).unbilled).toBe(400);
   });
 
   it('never reports a negative liability on overpayment', () => {
@@ -86,15 +104,20 @@ describe('cardPosition', () => {
   });
 });
 
-describe('the installment balance pays itself down', () => {
+describe('the installment plan comes down when it is PAID', () => {
   const SETUP = new Date(2026, 1, 10).getTime();
+  const AUG = new Date(2026, 7, 14);
 
-  function planned(over: Partial<CardSetup> = {}) {
+  function planned(over: Partial<CardSetup> = {}, txs: Tx[] = []) {
     return {
       ...emptyLedger(),
       cardCfg: { limit: 20000, closeDay: 1, dueDay: 25 },
-      cardSetup: { stmt0: 0, unbilled0: 0, instBal: 4800, instMo: 400, setupAt: SETUP, ...over },
+      cardSetup: { stmt0: 1000, unbilled0: 0, instBal: 4800, instMo: 400, setupAt: SETUP, ...over },
+      tx: txs,
     };
+  }
+  function pay(amt: number): Tx {
+    return { id: `p${amt}`, ts: new Date(2026, 7, 12).getTime(), type: 'ccpay', acct: 'bank', amt };
   }
 
   it('counts only whole months that have come round', () => {
@@ -104,33 +127,69 @@ describe('the installment balance pays itself down', () => {
     expect(monthsElapsed(SETUP, new Date(2027, 1, 10))).toBe(12);
   });
 
-  it('takes one charge off for each month elapsed', () => {
-    expect(cardPosition(planned(), new Date(2026, 1, 10)).instBal).toBe(4800);
-    expect(cardPosition(planned(), new Date(2026, 4, 10)).instBal).toBe(3600);
-    expect(cardPosition(planned(), new Date(2026, 7, 14)).instBal).toBe(2400);
+  it('does not move for someone who has paid nothing', () => {
+    // Time alone must never retire an installment: the balance is what is
+    // still owed, and nothing has been settled.
+    expect(cardPosition(planned(), AUG).instBal).toBe(4800);
   });
 
-  it('stops at zero rather than going negative once the plan finishes', () => {
-    expect(cardPosition(planned(), new Date(2028, 0, 10)).instBal).toBe(0);
+  it('retires the installment once the statement is cleared and more is paid', () => {
+    // 1,000 clears the statement; the next 400 settles one installment.
+    expect(cardPosition(planned({}, [pay(1400)]), AUG).instBal).toBe(4400);
   });
 
-  it('leaves an older setup with no date exactly as it was', () => {
-    // Amortising from an unknown start would invent a payment history.
-    const legacy = planned({ setupAt: null });
-    expect(cardPosition(legacy, new Date(2027, 5, 1)).instBal).toBe(4800);
+  it('retires several when several are paid at once', () => {
+    expect(cardPosition(planned({}, [pay(1000 + 1200)]), AUG).instBal).toBe(3600);
   });
 
-  it('does not amortise a plan with no declared monthly charge', () => {
-    const unknown = planned({ instMo: 0 });
-    expect(cardPosition(unknown, new Date(2027, 5, 1)).instBal).toBe(4800);
+  it('leaves the plan alone while the payment is still covering the statement', () => {
+    const p = cardPosition(planned({}, [pay(600)]), AUG);
+    expect(p.stmtRem).toBe(400);
+    expect(p.instBal).toBe(4800);
   });
 
-  it('shrinks what the claim defers as the plan is paid down', () => {
-    const early = cardClaim(planned(), new Date(2026, 1, 1).getTime(), new Date(2026, 1, 10));
-    const later = cardClaim(planned(), new Date(2026, 7, 1).getTime(), new Date(2026, 7, 14));
-    expect(early.deferred).toBe(4400);
-    expect(later.deferred).toBe(2000);
-    // The monthly charge itself keeps being claimed either way.
-    expect(later.installment).toBe(400);
+  it('never retires more than has been billed to date', () => {
+    // Six months in, only 7 charges have been billed however much is paid.
+    const p = cardPosition(planned({}, [pay(1000 + 4800)]), AUG);
+    expect(instBilled({ stmt0: 1000, unbilled0: 0, instBal: 4800, instMo: 400, setupAt: SETUP }, AUG)).toBe(2800);
+    expect(p.instBal).toBe(2000);
+  });
+
+  it('sends anything past the billed installments to unbilled spending', () => {
+    // 1,000 statement + 2,800 billed installments = 3,800; the last 500 lands
+    // on the running balance rather than vanishing.
+    const p = cardPosition(planned({ unbilled0: 900 }, [pay(4300)]), AUG);
+    expect(p.instBal).toBe(2000);
+    expect(p.unbilled).toBe(400);
+  });
+
+  it('stops at zero rather than going negative', () => {
+    const p = cardPosition(planned({ setupAt: null }, [pay(1000 + 9000)]), AUG);
+    expect(p.instBal).toBe(0);
+  });
+
+  it('lets a setup with no date be paid off without waiting for months', () => {
+    // No start date means no schedule to measure, so payment alone decides.
+    const p = cardPosition(planned({ setupAt: null }, [pay(1000 + 800)]), AUG);
+    expect(p.instBal).toBe(4000);
+  });
+
+  it('does nothing for a plan with no declared monthly charge', () => {
+    const p = cardPosition(planned({ instMo: 0 }, [pay(5000)]), AUG);
+    expect(p.instBal).toBe(4800);
+  });
+
+  it('states both bills: the one standing now and the one coming', () => {
+    const k = cardClaim(planned(), new Date(2026, 7, 1).getTime(), AUG);
+    expect(k.billNow).toBe(1000 + 400);
+    expect(k.billNext).toBe(k.cycleUnbilled + k.carried + 400);
+  });
+
+  it('shrinks what the claim defers as the plan is actually paid down', () => {
+    const unpaid = cardClaim(planned(), new Date(2026, 7, 1).getTime(), AUG);
+    const paid = cardClaim(planned({}, [pay(1000 + 1200)]), new Date(2026, 7, 1).getTime(), AUG);
+    expect(unpaid.deferred).toBe(4400);
+    expect(paid.deferred).toBe(3200);
+    expect(paid.installment).toBe(400);
   });
 });

@@ -58,6 +58,19 @@ export function CardClaimBreakdown({ claim, compact = false }: { claim: Claim; c
         </View>
       )}
 
+      {/*
+        The two bills, stated separately. "What do I owe now" and "what is
+        building up for next month" are different questions and were being
+        answered by one figure.
+      */}
+      <View style={{ marginTop: SPACE.md }}>
+        <Row label={t('cardBillNow')} value={money(claim.billNow)} valueColor={p.negative} />
+        <Caption style={{ marginTop: SPACE.xs }}>{t('cardBillNowNote')}</Caption>
+        {claim.billNext > 0 && (
+          <Row label={t('cardNextBillL')} value={money(claim.billNext)} valueColor={p.warn} />
+        )}
+      </View>
+
       {claim.deferred > 0 && (
         <View style={{ marginTop: SPACE.md }}>
           <Row
@@ -76,8 +89,10 @@ export function CardClaimBreakdown({ claim, compact = false }: { claim: Claim; c
       <View style={{ marginTop: SPACE.md }}>
         <Row label={t('cardChargedNow')} value={money(claim.chargedThisMonth)} valueColor={p.ink} />
         <Row label={t('cardTotalOwed')} value={money(claim.totalOwed)} valueColor={p.negative} />
-        {claim.deferred === 0 && (
+        {claim.deferred === 0 ? (
           <Caption style={{ marginTop: SPACE.xs, color: p.positive }}>{t('cardFullyCharged')}</Caption>
+        ) : (
+          <Caption style={{ marginTop: SPACE.xs }}>{t('cardPayNote')}</Caption>
         )}
       </View>
 

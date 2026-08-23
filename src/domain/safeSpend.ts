@@ -1,6 +1,7 @@
 import { bankBalance, cashBalance } from './balances';
 import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPosition } from './card';
 import { commitmentsDue, type CommitmentsDue } from './commitments';
+import { fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
 import type { Ledger } from './types';
 
@@ -9,8 +10,10 @@ export interface SafeSpend {
   cash: number | null;
   /** Bank + cash. Card headroom is credit, not money, so it is excluded. */
   liquid: number;
-  /** Already earmarked for goals. */
+  /** Money standing behind goals, after auto goals draw on the balance. */
   protectedAlloc: number;
+  /** Which goal each dirham of the balance is serving. */
+  funding: FundingPlan;
   /** Commitments still owed this cycle, after date and paid-status checks. */
   commitObl: number;
   /** Every commitment's standing this cycle: due date, state, what it claims. */
@@ -38,12 +41,6 @@ export interface SafeSpend {
    * in `cardDue` — surfaced only so the breakdown can say where it went.
    */
   cardCycleUnbilled: number;
-  /**
-   * What the card will bill next month if nothing else is charged: everything
-   * currently unbilled, plus the installment that keeps running. A forward
-   * cash-flow warning, not a deduction from this month.
-   */
-  cardNextBill: number;
   /** The full, auditable statement of what the card claims and when. */
   cardClaim: CardClaim;
   /** Planned international transfers. */
@@ -121,7 +118,13 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const cash = cashBalance(s);
   const liquid = bank + (cash ?? 0);
 
-  const protectedAlloc = s.goals.reduce((a, g) => a + g.alloc, 0);
+  /*
+   * Auto goals draw their progress from the balance rather than from a figure
+   * typed by hand, so what a goal holds — and therefore what it still needs
+   * each month — has to be resolved before the requirement is worked out.
+   */
+  const funding = fundGoals(s.goals, liquid, fx);
+  const protectedAlloc = funding.funded;
   /*
    * Commitments are scheduled rather than summed. The old filter deducted
    * every unpaid one regardless of date, and trusted a `paidMonth` flag that
@@ -186,7 +189,9 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const floorMonthly = Math.max(0, s.minDailySpend ?? 0) * daysInMonth;
   const basisPool = s.sslBasis === 'balance' ? bank + (cash ?? 0) : s.base;
   const poolBeforeGoal = basisPool - commitObl - planT - cardDue;
-  const goalAsked = goalsMonthlyRequirement(s.goals, fx);
+  const goalAsked = goalsMonthlyRequirement(s.goals, fx, (g) =>
+    funding.goals.find((x) => x.goal.id === g.id)?.held ?? g.alloc,
+  );
   const goalReq = Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
 
@@ -243,6 +248,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     cash,
     liquid,
     protectedAlloc,
+    funding,
     commitObl,
     commitments,
     cardObl,
@@ -254,7 +260,6 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     },
     cardCycleUnbilled: carry.unbilledCycle,
     cardClaim: cardClaim(s, countFrom, now),
-    cardNextBill: cc.unbilled + cc.instMo,
     planT,
     goalReq,
     goalAsked,

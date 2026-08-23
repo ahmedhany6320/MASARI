@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, DayPicker, Sheet, TextField } from '../../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import {
-  allocationCheck,
   commitmentsDue,
+  heldFor,
   debtSummary,
   formatEgp,
   goalMonthlyRequirement,
@@ -72,6 +72,10 @@ export default function PlanScreen() {
   const [months, setMonths] = useState('');
   const [dir, setDir] = useState<DebtDirection>('owe');
   const [currency, setCurrency] = useState<'AED' | 'EGP'>('AED');
+  // Auto is the default for a new goal: reading progress off the balance is
+  // what makes a goal work without bookkeeping, and manual is the exception.
+  const [goalAuto, setGoalAuto] = useState<'auto' | 'manual'>('auto');
+  const [allocDraft, setAllocDraft] = useState('');
   const [acct, setAcct] = useState<Account>('bank');
   // Which person's history is expanded. Collapsed by default so the list
   // stays scannable.
@@ -93,6 +97,8 @@ export default function PlanScreen() {
       setAmount(g?.target != null ? String(g.target) : '');
       setMonths(g?.months != null ? String(g.months) : '');
       setCurrency(g && isEgpGoal(g) ? 'EGP' : 'AED');
+      setGoalAuto(g?.auto ? 'auto' : 'manual');
+      setAllocDraft(g?.alloc ? String(g.alloc) : '');
     } else if (next.kind === 'budget') {
       setAmount(String(ledger.budgets[next.catId] ?? ''));
     } else if (next.kind === 'settle') {
@@ -106,6 +112,8 @@ export default function PlanScreen() {
       setMonths('');
       setDir('owe');
       setCurrency('AED');
+      setGoalAuto('auto');
+      setAllocDraft('');
     }
     setSheet(next);
   }
@@ -146,15 +154,20 @@ export default function PlanScreen() {
       }
       case 'goal': {
         if (!name.trim()) return;
+        const auto = goalAuto === 'auto';
         const patch = {
           ar: name.trim(),
           en: name.trim(),
           currency,
           target: amountVal,
           months: monthsVal != null && monthsVal > 0 ? Math.round(monthsVal) : null,
+          auto,
+          // An auto goal reads its progress off the balance, so the declared
+          // figure is cleared rather than left to contradict it.
+          alloc: auto ? 0 : (parseAmount(allocDraft) ?? 0),
         };
         if (sheet.id) updateGoal(sheet.id, patch);
-        else addGoal({ ...patch, alloc: 0, extEgp: 0, auto: false });
+        else addGoal({ ...patch, extEgp: 0 });
         break;
       }
     }
@@ -207,12 +220,9 @@ export default function PlanScreen() {
   const due = useMemo(() => commitmentsDue(ledger.commits, new Date()), [ledger.commits]);
   const commitStates = due.items;
 
-  // Bank plus cash only. Card headroom is credit, and a goal "funded" by a
-  // credit limit is not funded.
-  const alloc = useMemo(
-    () => allocationCheck(ledger.goals, c.liquid),
-    [ledger.goals, c.liquid],
-  );
+  // Resolved by the same engine the daily limit reads, so this screen and the
+  // limit can never disagree about what each goal holds.
+  const alloc = c.funding;
 
   function commitLabel(state: CommitState, daysAway: number | null, day: number | null): string {
     if (state === 'paused') return t('cmPaused');
@@ -482,12 +492,12 @@ export default function PlanScreen() {
               <View style={{ marginTop: SPACE.md }}>
                 <Caption>{t('allocNote')}</Caption>
                 <View style={{ marginTop: SPACE.sm }}>
-                  <Row label={t('allocTotal')} value={money(alloc.allocated)} />
+                  <Row label={t('allocTotal')} value={money(alloc.funded)} />
                   <Row label={t('allocLiquid')} value={money(alloc.liquid)} />
                   {alloc.overAllocated ? (
                     <Row
                       label={t('allocUnbacked')}
-                      value={money(alloc.unbacked)}
+                      value={money(alloc.funded - alloc.liquid)}
                       valueColor={p.negative}
                     />
                   ) : (
@@ -516,10 +526,13 @@ export default function PlanScreen() {
                   const egp = isEgpGoal(g);
                   // Progress is shown in the goal's own currency so the bar
                   // matches the target the user actually typed in.
-                  const held = egp ? g.alloc * fxRate + (g.extEgp ?? 0) : g.alloc;
+                  // What the goal actually has behind it: drawn from the
+                  // balance for an auto goal, declared for a manual one.
+                  const heldAed = heldFor(c.funding, g.id);
+                  const held = egp ? heldAed * fxRate + (g.extEgp ?? 0) : heldAed;
                   const ratio = g.target ? held / g.target : 0;
-                  const perMonth = goalMonthlyRequirement(g, fxRate);
-                  const cover = alloc.perGoal.find((x) => x.goal.id === g.id);
+                  const perMonth = goalMonthlyRequirement(g, fxRate, heldAed);
+                  const cover = alloc.goals.find((x) => x.goal.id === g.id);
                   const fmt = (n: number) => (egp ? formatEgp(n, lang) : money(n));
                   return (
                     <View key={g.id} style={{ marginBottom: SPACE.lg }}>
@@ -534,12 +547,12 @@ export default function PlanScreen() {
                           ? `${money(perMonth)} / ${t('monthsW')} · ${num(g.months ?? 0)} ${t('monthsW')}`
                           : t('goalNoSchedule')}
                       </Caption>
-                      {cover != null && cover.unbacked > 0 && (
-                        <Caption style={{ color: p.negative }}>
-                          {t('allocShort')} {money(cover.unbacked)} · {t('allocBacked')}{' '}
-                          {money(cover.backed)}
-                        </Caption>
-                      )}
+                      <Caption style={{ color: p.sub }}>
+                        {cover?.fromBalance ? t('fundFromBal') : t('fundDeclared')}
+                        {cover != null && cover.short > 0
+                          ? ` · ${t('allocShort')} ${money(cover.short)}`
+                          : ''}
+                      </Caption>
                       <View style={[styles.actions, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
                         <Button
                           label={t('del')}
@@ -641,6 +654,28 @@ export default function PlanScreen() {
             />
             <TextField label={t('goalTarget')} value={amount} onChange={setAmount} numeric big />
             <TextField label={t('monthsLeft')} hint={t('monthsHint')} value={months} onChange={setMonths} numeric />
+            <Chips
+              label={t('fundSrcT')}
+              hint={goalAuto === 'auto' ? t('fundAutoHint') : t('fundManualHint')}
+              value={goalAuto}
+              onChange={(v) => setGoalAuto(v as 'auto' | 'manual')}
+              options={[
+                { id: 'auto', label: t('fundAuto') },
+                { id: 'manual', label: t('fundManual') },
+              ]}
+            />
+            {/* Only a manual goal has a figure to type; an auto one reads it
+                off the balance, so offering the field would invite someone to
+                set a number the app is about to ignore. */}
+            {goalAuto === 'manual' && (
+              <TextField
+                label={t('fundSaved')}
+                hint={t('fundSavedHint')}
+                value={allocDraft}
+                onChange={setAllocDraft}
+                numeric
+              />
+            )}
           </>
         )}
       </Sheet>

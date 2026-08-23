@@ -624,4 +624,18 @@ export const en: Record<StringKey, string> = {
   basisBalance: 'From my current balance',
   basisBalanceNote: 'The money you hold right now, less what is still coming. Right when you start mid-month with the salary already paid and partly spent — the balance is a fact, not a reconstruction.',
   basisBalanceHint: 'Currently worked out from your balance, not your salary.',
+
+  // ---- goal funding source -------------------------------------------------
+  fundSrcT: 'Where this goal is funded from',
+  fundAuto: 'From my account, automatically',
+  fundAutoHint: 'What is in the bank and in cash fills the goal by itself. Save into your account and the goal moves — nothing to record.',
+  fundManual: 'An amount I enter myself',
+  fundManualHint: 'For money saved somewhere the app cannot see — cash at home, another account.',
+  fundSaved: 'Allocated to this goal',
+  fundSavedHint: 'What is set aside for this goal right now.',
+  fundFromBal: 'From your account',
+  fundDeclared: 'As you entered it',
+  cardBillNow: 'This month bill',
+  cardBillNowNote: 'The statement due plus this month installment. What you are being asked to pay right now.',
+  cardPayNote: 'Once you pay the bill, the installment comes off the plan balance automatically.',
 };
