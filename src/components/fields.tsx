@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -272,3 +274,114 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
   },
 });
+
+/**
+ * A discrete slider, built from a pan gesture rather than a native module.
+ *
+ * Deliberately dependency-free: pulling in a native slider would make this an
+ * unavoidable new binary, and the whole point of the over-the-air path is that
+ * a change like this reaches the phone without one. `PanResponder` and a
+ * measured track are enough for an integer range.
+ */
+export function RangeSlider({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  onChange,
+  formatValue,
+}: {
+  label?: string;
+  hint?: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  formatValue?: (v: number) => string;
+}) {
+  const p = usePalette();
+  const { rtl } = useLocalization();
+  const [width, setWidth] = useState(0);
+
+  const span = Math.max(1, max - min);
+  const ratio = Math.min(1, Math.max(0, (value - min) / span));
+
+  // Kept in a ref so the responder closure never reads a stale width.
+  const widthRef = useRef(0);
+  widthRef.current = width;
+
+  const pick = useCallback(
+    (x: number) => {
+      const w = widthRef.current;
+      if (w <= 0) return;
+      // The track runs right-to-left in Arabic, so the gesture has to be read
+      // in the same direction the thumb is drawn.
+      const raw = rtl ? 1 - x / w : x / w;
+      const next = Math.round(min + Math.min(1, Math.max(0, raw)) * span);
+      onChange(Math.min(max, Math.max(min, next)));
+    },
+    [min, max, span, onChange, rtl],
+  );
+
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (e) => pick(e.nativeEvent.locationX),
+        onPanResponderMove: (e) => pick(e.nativeEvent.locationX),
+      }),
+    [pick],
+  );
+
+  return (
+    <View style={{ marginBottom: SPACE.lg }}>
+      {label != null && (
+        <View style={{ flexDirection: rtl ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
+          <Body>{label}</Body>
+          <Body style={{ color: p.accentDeep, fontWeight: '700' }}>
+            {formatValue ? formatValue(value) : String(value)}
+          </Body>
+        </View>
+      )}
+      {hint != null && hint !== '' && <Caption>{hint}</Caption>}
+
+      <View
+        {...responder.panHandlers}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        // A generous touch target around a thin visual track: the bar is 6px
+        // but the finger is not.
+        style={{ paddingVertical: SPACE.md, marginTop: SPACE.sm }}
+      >
+        <View style={{ height: 6, borderRadius: 3, backgroundColor: p.faint }}>
+          <View
+            style={{
+              position: 'absolute',
+              [rtl ? 'right' : 'left']: 0,
+              top: 0,
+              bottom: 0,
+              width: `${ratio * 100}%`,
+              borderRadius: 3,
+              backgroundColor: p.accent,
+            }}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              [rtl ? 'right' : 'left']: `${ratio * 100}%`,
+              top: -9,
+              width: 24,
+              height: 24,
+              marginHorizontal: -12,
+              borderRadius: 12,
+              backgroundColor: p.accent,
+              borderWidth: 3,
+              borderColor: p.surface,
+            }}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}

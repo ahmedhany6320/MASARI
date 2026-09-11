@@ -2,7 +2,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Chips, Sheet, TextField } from '../src/components/fields';
+import { Chips, RangeSlider, Sheet, TextField } from '../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../src/components/ui';
 import {
   adaptiveOutlook,
@@ -21,7 +21,6 @@ import { useCapacity, useLocalization, usePalette, useSafeSpend } from '../src/s
 import { useLedger } from '../src/store/useLedger';
 import { FONT, RADIUS, SPACE } from '../src/theme/tokens';
 
-const HORIZONS = [6, 8, 12, 18, 24, 36] as const;
 
 /**
  * Goal plan — the screen that answers "am I actually going to get there".
@@ -246,10 +245,16 @@ export default function GoalPlanScreen() {
             <Title>{t('landingT')}</Title>
             <Caption>{t('landingNote')}</Caption>
 
-            <Chips
+            {/* The full range rather than four fixed stops: the interesting
+                answer is almost never one of the round numbers. */}
+            <RangeSlider
+              label={t('hzT')}
+              hint={t('hzSub')}
               value={horizon}
-              onChange={(h) => setHorizon(h)}
-              options={HORIZONS.map((h) => ({ id: h, label: `${h} ${t('monthsW')}` }))}
+              min={1}
+              max={24}
+              onChange={setHorizon}
+              formatValue={(v) => `${num(v)} ${t('monthsW')}`}
             />
 
             <Text style={[styles.hero, { color: track.reachesAspiration ? p.positive : p.accent, textAlign: rtl ? 'right' : 'left' }]}>
@@ -340,10 +345,13 @@ export default function GoalPlanScreen() {
           <Title>{t('whereMoneyGetsMe')}</Title>
           <Caption>{t('whereMoneyGetsMeNote')}</Caption>
 
-          <Chips
+          <RangeSlider
             value={horizon}
-            onChange={(h) => setHorizon(h)}
-            options={HORIZONS.map((h) => ({ id: h, label: `${h} ${t('monthsW')}` }))}
+            min={1}
+            max={24}
+            onChange={setHorizon}
+            formatValue={(v) => `${num(v)} ${t('monthsW')}`}
+            label={t('hzT')}
           />
 
           <View style={{ marginTop: SPACE.sm }}>

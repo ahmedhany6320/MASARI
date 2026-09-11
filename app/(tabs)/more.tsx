@@ -139,6 +139,12 @@ export default function MoreScreen() {
             badge={goalNeedsDeadline}
           />
           <Tile
+            icon="📅"
+            label={t('fcT')}
+            hint={t('fcSub')}
+            onPress={() => router.push('/forecast')}
+          />
+          <Tile
             icon="🛟"
             label={t('floorT')}
             value={c.bufferTarget > 0 ? money(c.bufferHeld) : undefined}

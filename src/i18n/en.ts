@@ -738,4 +738,29 @@ export const en: Record<StringKey, string> = {
   adaptLowered: 'Your pace slipped and the goal came down.',
   adaptShort: 'Gap to your goal',
   adaptNote: 'Recomputed every day. Save and it rises; spend and it falls.',
+
+  // ---- forecast ------------------------------------------------------------
+  fcT: 'Your balance, month by month',
+  fcSub: 'Plain arithmetic: salary in, obligations out, and what is left opens the next month.',
+  fcOpening: 'Opening balance',
+  fcSalary: 'Salary',
+  fcCommit: 'Commitments',
+  fcTransfer: 'Transfers',
+  fcCard: 'Card',
+  fcGoal: 'To the goal',
+  fcLiving: 'Living',
+  fcClosing: 'Closing balance',
+  fcSaved: 'Saved toward the goal',
+  fcThisMonth: 'This month (what is left of it)',
+  fcNegative: 'The balance goes below zero this month.',
+  fcHorizon: 'How many months ahead?',
+  fcNote: 'The current month counts only what is left of it, not a full cycle — the salary has landed and part of it is spent.',
+
+  // ---- goal horizon slider -------------------------------------------------
+  hzT: 'Try a duration',
+  hzSub: 'Move the duration and see where you land.',
+  hzMonths: 'months',
+  hzReaches: 'reaches the goal',
+  hzShort: 'short by',
+  hzPick: 'Use this duration',
 };
