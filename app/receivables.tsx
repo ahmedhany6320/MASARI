@@ -25,10 +25,13 @@ export default function ReceivablesScreen() {
 
   const ledger = useLedger((s) => s.ledger);
   const addReceivable = useLedger((s) => s.addReceivable);
+  const updateReceivable = useLedger((s) => s.updateReceivable);
   const removeReceivable = useLedger((s) => s.removeReceivable);
   const receiveReceivable = useLedger((s) => s.receiveReceivable);
 
-  const [sheet, setSheet] = useState<null | { kind: 'add' } | { kind: 'receive'; id: string }>(null);
+  const [sheet, setSheet] = useState<
+    null | { kind: 'add'; id?: string } | { kind: 'receive'; id: string }
+  >(null);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [exact, setExact] = useState<'yes' | 'no'>('yes');
@@ -47,14 +50,16 @@ export default function ReceivablesScreen() {
     if (!sheet) return;
     if (sheet.kind === 'add') {
       if (!name.trim() || amountVal == null || amountVal <= 0) return;
-      addReceivable({
+      const patch = {
         ar: name.trim(),
         en: name.trim(),
         amt: amountVal,
         exact: exact === 'yes',
-        status: 'expected',
-        actual: null,
-      });
+      };
+      // Editing leaves `status` and `actual` alone: an expectation already
+      // marked received must not be reopened by correcting its name.
+      if (sheet.id) updateReceivable(sheet.id, patch);
+      else addReceivable({ ...patch, status: 'expected', actual: null });
       setName('');
       setAmount('');
     } else {
@@ -108,6 +113,16 @@ export default function ReceivablesScreen() {
                         setAmount(String(r.amt));
                         setAcct('bank');
                         setSheet({ kind: 'receive', id: r.id });
+                      }}
+                    />
+                    <Button
+                      label={t('edit')}
+                      variant="secondary"
+                      onPress={() => {
+                        setName(r[lang]);
+                        setAmount(String(r.amt));
+                        setExact(r.exact ? 'yes' : 'no');
+                        setSheet({ kind: 'add', id: r.id });
                       }}
                     />
                     <Button

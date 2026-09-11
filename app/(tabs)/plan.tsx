@@ -46,8 +46,11 @@ export default function PlanScreen() {
   const addCommitment = useLedger((s) => s.addCommitment);
   const updateCommitment = useLedger((s) => s.updateCommitment);
   const setCommitmentPaid = useLedger((s) => s.setCommitmentPaid);
+  const settleCommitment = useLedger((s) => s.settleCommitment);
+  const setTransferSent = useLedger((s) => s.setTransferSent);
   const removeCommitment = useLedger((s) => s.removeCommitment);
   const addPerson = useLedger((s) => s.addPerson);
+  const updatePerson = useLedger((s) => s.updatePerson);
   const removePerson = useLedger((s) => s.removePerson);
   const settlePerson = useLedger((s) => s.settlePerson);
   const addGoal = useLedger((s) => s.addGoal);
@@ -55,6 +58,7 @@ export default function PlanScreen() {
   const removeGoal = useLedger((s) => s.removeGoal);
   const setBudget = useLedger((s) => s.setBudget);
   const addCategory = useLedger((s) => s.addCategory);
+  const removeCategory = useLedger((s) => s.removeCategory);
 
   // ---- sheet state --------------------------------------------------------
   const [sheet, setSheet] = useState<
@@ -62,7 +66,7 @@ export default function PlanScreen() {
     | { kind: 'commit'; id?: string }
     | { kind: 'budget'; catId: string }
     | { kind: 'category' }
-    | { kind: 'person' }
+    | { kind: 'person'; id?: string }
     | { kind: 'settle'; id: string }
     | { kind: 'goal'; id?: string }
   >(null);
@@ -77,6 +81,8 @@ export default function PlanScreen() {
   // what makes a goal work without bookkeeping, and manual is the exception.
   const [goalAuto, setGoalAuto] = useState<'auto' | 'manual'>('auto');
   const [allocDraft, setAllocDraft] = useState('');
+  const [settling, setSettling] = useState<string | null>(null);
+  const [settleDraft, setSettleDraft] = useState('');
   const [acct, setAcct] = useState<Account>('bank');
   // Which person's history is expanded. Collapsed by default so the list
   // stays scannable.
@@ -102,6 +108,11 @@ export default function PlanScreen() {
       // legacy goal has `auto: false` yet draws from the balance all the same.
       setGoalAuto(g != null && drawsFromBalance(g) ? 'auto' : 'manual');
       setAllocDraft(g?.alloc ? String(g.alloc) : '');
+    } else if (next.kind === 'person' && next.id) {
+      const person = ledger.people.find((x) => x.id === next.id);
+      setName(person?.name ?? '');
+      setAmount(person != null ? String(person.amt) : '');
+      setDir(person?.dir ?? 'owe');
     } else if (next.kind === 'budget') {
       setAmount(String(ledger.budgets[next.catId] ?? ''));
     } else if (next.kind === 'settle') {
@@ -147,7 +158,19 @@ export default function PlanScreen() {
         break;
       case 'person': {
         if (!name.trim() || amountVal == null || amountVal <= 0) return;
-        addPerson({ name: name.trim(), amt: amountVal, out: amountVal, dir, fromAcct: 'bank' });
+        if (sheet.id) {
+          // Editing must not silently reset what has already been repaid, so
+          // only the principal moves with the declared amount.
+          const existing = ledger.people.find((x) => x.id === sheet.id);
+          updatePerson(sheet.id, {
+            name: name.trim(),
+            amt: amountVal,
+            dir,
+            out: Math.min(existing?.out ?? amountVal, amountVal),
+          });
+        } else {
+          addPerson({ name: name.trim(), amt: amountVal, out: amountVal, dir, fromAcct: 'bank' });
+        }
         break;
       }
       case 'settle': {
@@ -295,6 +318,21 @@ export default function PlanScreen() {
                 )}
                 <Row label={t('total')} value={money(due.total)} valueColor={p.accentDeep} />
                 <Caption style={{ marginTop: SPACE.xs }}>{t('cmResetNote')}</Caption>
+
+                {/* What the differences added up to. The feature is invisible
+                    without this: money moves to the goal and nothing says so. */}
+                <View style={{ marginTop: SPACE.md }}>
+                  <Caption>{t('varT')}</Caption>
+                  {c.variance.toGoal !== 0 ? (
+                    <Row
+                      label={t('varToGoal')}
+                      value={money(c.variance.toGoal)}
+                      valueColor={c.variance.toGoal > 0 ? p.positive : p.negative}
+                    />
+                  ) : (
+                    <Caption style={{ marginTop: SPACE.xs }}>{t('varNone')}</Caption>
+                  )}
+                </View>
               </View>
             )}
 
@@ -333,9 +371,19 @@ export default function PlanScreen() {
                     )}
                     <View style={[styles.actions, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
                       <Button
-                        label={state === 'paid' ? t('markUnpaid') : t('payNow')}
+                        label={state === 'paid' ? t('markUnpaid') : t('settleBtn')}
                         variant="secondary"
-                        onPress={() => setCommitmentPaid(k.id, state !== 'paid')}
+                        onPress={() => {
+                          if (state === 'paid') {
+                            setCommitmentPaid(k.id, false);
+                            return;
+                          }
+                          // Prefilled with the plan, because paying exactly
+                          // what was budgeted is the common case and should
+                          // cost one tap, not a retype.
+                          setSettleDraft(k.amt != null ? String(k.amt) : '');
+                          setSettling(k.id);
+                        }}
                       />
                       <Button
                         label={k.paused ? t('resume') : t('pause')}
@@ -380,6 +428,15 @@ export default function PlanScreen() {
                       onPress={() => openSheet({ kind: 'budget', catId: cat.id })}
                     />
                     {budget != null && <Meter ratio={ratio} color={over ? p.negative : p.accent} />}
+                    <View style={[styles.actions, { flexDirection: rtl ? 'row-reverse' : 'row' }]}>
+                      <Button
+                        label={t('del')}
+                        variant="secondary"
+                        onPress={() =>
+                          confirmDelete(cat[lang], () => removeCategory(cat.id))
+                        }
+                      />
+                    </View>
                   </View>
                 );
               })}
@@ -461,6 +518,11 @@ export default function PlanScreen() {
                             onPress={() => openSheet({ kind: 'settle', id: person.id })}
                           />
                         )}
+                        <Button
+                          label={t('edit')}
+                          variant="secondary"
+                          onPress={() => openSheet({ kind: 'person', id: person.id })}
+                        />
                         <Button
                           label={t('del')}
                           variant="secondary"
@@ -681,6 +743,50 @@ export default function PlanScreen() {
             )}
           </>
         )}
+      </Sheet>
+
+      <Sheet
+        visible={settling != null}
+        title={t('settleT')}
+        onClose={() => setSettling(null)}
+        onSubmit={() => {
+          const v = parseAmount(settleDraft);
+          if (settling == null || v == null || v < 0) return;
+          settleCommitment(settling, v);
+          setSettling(null);
+        }}
+        submitLabel={t('settleBtn')}
+        canSubmit={(parseAmount(settleDraft) ?? -1) >= 0}
+      >
+        <Caption>{t('settleHint')}</Caption>
+        <View style={{ height: SPACE.md }} />
+        {(() => {
+          const k = ledger.commits.find((x) => x.id === settling);
+          const planned = k?.amt ?? 0;
+          const actual = parseAmount(settleDraft);
+          const diff = actual != null ? planned - actual : 0;
+          return (
+            <>
+              <Row label={t('settlePlanned')} value={money(planned)} />
+              <TextField
+                label={t('settleActual')}
+                value={settleDraft}
+                onChange={setSettleDraft}
+                numeric
+                big
+              />
+              {/* The consequence, live, while the number is being typed —
+                  which is the only moment it changes anyone's behaviour. */}
+              {actual != null && Math.abs(diff) > 0.005 && (
+                <Row
+                  label={diff > 0 ? t('settleDiffPlus') : t('settleDiffMinus')}
+                  value={money(Math.abs(diff))}
+                  valueColor={diff > 0 ? p.positive : p.negative}
+                />
+              )}
+            </>
+          );
+        })()}
       </Sheet>
     </Screen>
   );

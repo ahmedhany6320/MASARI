@@ -41,6 +41,7 @@ export default function TransfersScreen() {
   const addPlannedTransfer = useLedger((s) => s.addPlannedTransfer);
   const removePlannedTransfer = useLedger((s) => s.removePlannedTransfer);
   const sendTransfer = useLedger((s) => s.sendTransfer);
+  const setTransferSent = useLedger((s) => s.setTransferSent);
 
   const [sheet, setSheet] = useState<null | 'plan' | 'send' | 'rate'>(null);
   const [amount, setAmount] = useState('');
@@ -151,18 +152,46 @@ export default function TransfersScreen() {
         <Card>
           <Title>{t('plannedTransfers')}</Title>
           <Caption>{t('planTfNote')}</Caption>
+          <Caption>{t('tfSentHint')}</Caption>
           {ledger.planTf.length === 0 ? (
             <Body muted style={{ marginTop: SPACE.md }}>{t('noPlanned')}</Body>
           ) : (
             <View style={{ marginTop: SPACE.sm }}>
-              {ledger.planTf.map((tf) => (
-                <Row
-                  key={tf.id}
-                  label={tf.day ? `${t('dayOfMonth')} ${tf.day}` : t('plannedTransfers')}
-                  value={`${money(tf.amt)} · ${formatEgp(tf.amt * fxRate, lang)}`}
-                  onPress={() => removePlannedTransfer(tf.id)}
-                />
-              ))}
+              {ledger.planTf.map((tf) => {
+                const line = c.variance.transfers.find((x) => x.id === tf.id);
+                const sent = line?.settled === true;
+                return (
+                  <View key={tf.id} style={{ marginBottom: SPACE.md }}>
+                    <Row
+                      label={tf.day ? `${t('dayOfMonth')} ${tf.day}` : t('plannedTransfers')}
+                      value={`${money(tf.amt)} · ${formatEgp(tf.amt * fxRate, lang)}`}
+                      onPress={() => removePlannedTransfer(tf.id)}
+                    />
+                    {/* Once marked sent, what ACTUALLY left is read from the
+                        remittances rather than assumed equal to the plan, and
+                        the difference is shown going to the goal. */}
+                    {sent && line != null && (
+                      <>
+                        <Row label={t('tfActual')} value={money(line.actual ?? 0)} />
+                        {Math.abs(line.variance) > 0.005 && (
+                          <Row
+                            label={line.variance > 0 ? t('settleDiffPlus') : t('settleDiffMinus')}
+                            value={money(Math.abs(line.variance))}
+                            valueColor={line.variance > 0 ? p.positive : p.negative}
+                          />
+                        )}
+                      </>
+                    )}
+                    <View style={{ marginTop: SPACE.xs }}>
+                      <Button
+                        label={sent ? t('tfNotSent') : t('tfSentBtn')}
+                        variant="secondary"
+                        onPress={() => setTransferSent(tf.id, !sent)}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
               <Row label={t('total')} value={money(c.planT)} valueColor={p.accentDeep} />
               <Caption style={{ marginTop: SPACE.sm }}>{t('tapToDelete')}</Caption>
             </View>

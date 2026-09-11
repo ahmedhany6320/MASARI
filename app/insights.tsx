@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips } from '../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../src/components/ui';
 import {
+  analyticsReadiness,
   burnRate,
   categoryStats,
   detectRecurring,
@@ -50,6 +51,21 @@ export default function InsightsScreen() {
   const cats = useMemo(() => categoryStats(ledger, since), [ledger, since]);
   const recurring = useMemo(() => detectRecurring(ledger, now), [ledger, now]);
   const comparison = useMemo(() => monthComparison(ledger, now), [ledger, now]);
+  // Whether the data behind each view supports the conclusion it would draw.
+  const ready = useMemo(() => analyticsReadiness(ledger, now), [ledger, now]);
+
+  /** Shows a view only when it has the data, with a warning when it is thin. */
+  const gate = (level: 'good' | 'thin' | 'insufficient', body: React.ReactNode) =>
+    level === 'insufficient' ? (
+      <Body muted style={{ marginTop: SPACE.md }}>{t('rdNone')}</Body>
+    ) : (
+      <>
+        {level === 'thin' && (
+          <Caption style={{ color: p.warn, marginTop: SPACE.xs }}>{t('rdThin')}</Caption>
+        )}
+        {body}
+      </>
+    );
   const streak = useMemo(() => underLimitStreak(ledger, c.allowance, now), [ledger, c.allowance, now]);
 
   const catName = useMemo(() => {
@@ -162,13 +178,20 @@ export default function InsightsScreen() {
             valueColor={burn.projectedOverrun > 0 ? p.negative : p.positive}
           />
           <Row label={t('activeDays')} value={`${num(burn.activeDays)} / ${num(burn.days)}`} />
-          {comparison.change != null && (
+          {/*
+            Suppressed when last month has too few entries. "Spending down
+            94%" against a month nobody recorded is not a finding, it is the
+            absence of one — and it reads as the opposite of the truth.
+          */}
+          {comparison.change != null && ready.monthCompare !== 'insufficient' ? (
             <Row
               label={t('vsLastMonth')}
               value={`${comparison.change > 0 ? '+' : ''}${num(Math.round(comparison.change * 100))}%`}
               valueColor={comparison.change > 0 ? p.negative : p.positive}
             />
-          )}
+          ) : comparison.change != null ? (
+            <Caption style={{ color: p.warn, marginTop: SPACE.xs }}>{t('rdLastMonthEmpty')}</Caption>
+          ) : null}
           {streak > 0 && (
             <Caption style={{ marginTop: SPACE.sm, color: p.positive }}>
               🔥 {num(streak)} {t('streakDays')}
@@ -187,11 +210,34 @@ export default function InsightsScreen() {
           ]}
         />
 
+        {/*
+          Stated before any conclusion below it, because the reader needs to
+          know how much weight the rest of this screen can carry.
+        */}
+        <Card>
+          <Title>{t('rdT')}</Title>
+          <Row
+            label={t('rdDensity')
+              .replace('{n}', num(ready.recordedDays))
+              .replace('{d}', num(ready.totalDays))}
+            value={`${num(Math.round(ready.density * 100))}%`}
+            valueColor={
+              ready.overall === 'good' ? p.positive : ready.overall === 'thin' ? p.warn : p.negative
+            }
+          />
+          <Caption style={{ marginTop: SPACE.xs }}>
+            {ready.overall === 'good' ? t('rdGood') : t('rdWhy')}
+          </Caption>
+        </Card>
+
+
         {/* ---- merchants ---- */}
         <Card>
           <Title>{t('topMerchants')}</Title>
           <Caption>{t('topMerchantsNote')}</Caption>
-          {merchants.length === 0 ? (
+          {ready.merchants === 'insufficient' ? (
+            <Body muted style={{ marginTop: SPACE.md }}>{t('rdNone')}</Body>
+          ) : merchants.length === 0 ? (
             <Body muted style={{ marginTop: SPACE.md }}>{t('noDataYet')}</Body>
           ) : (
             <View style={{ marginTop: SPACE.md }}>
@@ -214,6 +260,9 @@ export default function InsightsScreen() {
         {/* ---- categories ---- */}
         <Card>
           <Title>{t('byCategory')}</Title>
+          {ready.categories === 'thin' && (
+            <Caption style={{ color: p.warn }}>{t('rdThin')}</Caption>
+          )}
           {cats.length === 0 ? (
             <Body muted style={{ marginTop: SPACE.md }}>{t('noDataYet')}</Body>
           ) : (
@@ -235,6 +284,9 @@ export default function InsightsScreen() {
         <Card>
           <Title>{t('recurringT')}</Title>
           <Caption>{t('recurringNote')}</Caption>
+          {ready.recurring === 'thin' && (
+            <Caption style={{ color: p.warn }}>{t('rdThin')}</Caption>
+          )}
           {recurring.length === 0 ? (
             <Body muted style={{ marginTop: SPACE.md }}>{t('noRecurring')}</Body>
           ) : (

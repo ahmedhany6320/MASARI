@@ -158,6 +158,16 @@ export function NotificationSettings() {
             setReminders({ commitments: v }),
           )}
 
+          {/* Placed last but the one that matters most: every figure in the
+              app is only as good as what was actually entered. */}
+          {row(t('notifLog'), t('notifLogHint'), reminders.logSpending, (v) =>
+            setReminders({ logSpending: v }),
+          )}
+          {reminders.logSpending &&
+            hourPicker(t('notifEvery'), [1, 2, 3, 4], reminders.logEveryHours, (h) =>
+              setReminders({ logEveryHours: h }),
+            )}
+
           <View style={{ marginTop: SPACE.md }}>
             <Button label={t('notifTest')} variant="secondary" onPress={() => void test()} disabled={busy} />
           </View>
