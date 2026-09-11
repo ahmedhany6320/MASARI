@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import {
   commitmentReminder,
+  dueTodayReminder,
+  logSpendingNudge,
   dueCommitments,
   morningBrief,
   overspendAlert,
@@ -128,6 +130,10 @@ async function scheduleDaily(
 }
 
 export interface ReminderSettings {
+  logSpending?: boolean;
+  logEveryHours?: number;
+  logFromHour?: number;
+  logToHour?: number;
   morning: boolean;
   morningHour: number;
   evening: boolean;
@@ -172,6 +178,29 @@ export async function rescheduleAll(
   if (reminders.commitments) {
     const msg = commitmentReminder(dueCommitments(ledger, now), lang);
     if (msg) await scheduleDaily(N, msg, reminders.morningHour, 30);
+
+    // A commitment falling due TODAY gets its own prompt naming it, because
+    // the actual amount has to be recorded at the moment it is paid — a
+    // general "something is coming up" does not produce that.
+    const today = dueTodayReminder(ledger.commits, lang, now);
+    if (today) await scheduleDaily(N, today, Math.max(8, reminders.morningHour - 1), 0);
+  }
+
+  /*
+   * The recording prompts. Every figure in the app is only as good as what was
+   * entered, and unrecorded spending is by far the largest source of error, so
+   * these are frequent by design — and each carries the remaining allowance so
+   * it is worth reading rather than merely worth dismissing.
+   */
+  if (reminders.logSpending) {
+    const step = Math.max(1, Math.round(reminders.logEveryHours ?? 2));
+    const from = Math.max(0, Math.min(23, reminders.logFromHour ?? 9));
+    const to = Math.max(from, Math.min(23, reminders.logToHour ?? 23));
+    const nudge = logSpendingNudge(c, lang);
+
+    for (let hour = from; hour <= to; hour += step) {
+      await scheduleDaily(N, nudge, hour, 0);
+    }
   }
 }
 

@@ -130,3 +130,41 @@ export function commitmentReminder(
     body: `${commits.map((k) => k.en).join(', ')} — ${money(total, lang)}`,
   };
 }
+
+/**
+ * The nudge that keeps the ledger honest.
+ *
+ * Every figure in this app is only as good as what was recorded, and the
+ * single largest source of error is spending that simply never got entered —
+ * measured at 11 recorded days out of 91 on a real ledger. A short, frequent
+ * prompt costs almost nothing and is the only thing that closes that gap.
+ *
+ * It leads with what is left rather than a bare "did you spend?", because a
+ * prompt carrying information gets read and a prompt asking a favour does not.
+ */
+export function logSpendingNudge(c: SafeSpend, lang: Lang): NotificationContent {
+  const left = money(c.ssl, lang);
+  return lang === 'ar'
+    ? { title: `باقي ${left} النهاردة`, body: 'صرفت حاجة؟ سجّلها دلوقتي وهي في دماغك.' }
+    : { title: `${left} left today`, body: 'Spent anything? Log it now while you remember.' };
+}
+
+/** Reminder that a specific commitment falls due today. */
+export function dueTodayReminder(
+  commits: Commitment[],
+  lang: Lang,
+  now: Date,
+): NotificationContent | null {
+  const today = now.getDate();
+  const due = commits.filter(
+    (k) => !k.paused && !isPaidFor(k, now) && k.day === today && (k.amt ?? 0) > 0,
+  );
+  if (due.length === 0) return null;
+
+  const total = due.reduce((a, k) => a + (k.amt ?? 0), 0);
+  const names = due.map((k) => (lang === 'ar' ? k.ar : k.en)).join(' + ');
+
+  return lang === 'ar'
+    ? { title: `${names} مستحق النهاردة`, body: `${money(total, lang)} — سجّل المبلغ الفعلي لما تدفع.` }
+    : { title: `${names} is due today`, body: `${money(total, lang)} — record what you actually pay.` };
+}

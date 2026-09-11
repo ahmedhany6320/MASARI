@@ -107,7 +107,8 @@ export default function GoalPlanScreen() {
   const plan = goalPlan(goal, capacity, fxRate, now);
   const at = projectGoal(goal, capacity, fxRate, horizon);
   const req = requirementFor(goal, horizon, capacity, fxRate);
-  const scenarios = goalScenarios(goal, capacity, fxRate);
+  // Bounded by the living band, so no option can imply a day nobody survives.
+  const scenarios = goalScenarios(goal, capacity, fxRate, spend.band);
 
   const floorCeil = plan.floorMonths != null ? Math.ceil(plan.floorMonths) : null;
   const paceCeil = plan.monthsAtPace != null ? Math.ceil(plan.monthsAtPace) : null;

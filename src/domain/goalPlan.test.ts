@@ -234,3 +234,58 @@ describe('safeSpend — baseline starts the count from today', () => {
     expect(safeSpend(old, FX, NOW).cycleSpend).toBeCloseTo(681.81, 2);
   });
 });
+
+describe('goalScenarios never offers a plan you cannot live on', () => {
+  const egypt: Goal = {
+    id: 'egypt', ar: 'مصر', en: 'Egypt', currency: 'EGP',
+    target: 1_100_000, alloc: 0, months: null, extEgp: 0, auto: true,
+  };
+  const cap: Capacity = {
+    poolBeforeGoal: 6018, projectedSpend: 1240, saving: 4778, daysInMonth: 31,
+  };
+  const band = { min: 20, comfort: 40 };
+
+  it('drops every option below the declared floor', () => {
+    // The reported bug: a "fastest" plan offering nine dirhams a day while a
+    // living floor sat right beside it.
+    for (const s of goalScenarios(egypt, cap, 13.6, band)) {
+      expect(s.requirement.maxDailyAed).toBeGreaterThanOrEqual(band.min - 1e-6);
+    }
+  });
+
+  it('bases the fastest plan on the floor, not on spending nothing', () => {
+    const withBand = goalScenarios(egypt, cap, 13.6, band);
+    const unbounded = goalScenarios(egypt, cap, 13.6, null);
+    const fastestWith = withBand.find((s) => s.id === 'fastest');
+    const fastestWithout = unbounded.find((s) => s.id === 'fastest');
+    // Spending the floor rather than nothing means the goal takes longer —
+    // which is the honest answer.
+    if (fastestWith && fastestWithout) {
+      expect(fastestWith.months).toBeGreaterThanOrEqual(fastestWithout.months);
+    }
+  });
+
+  it('still offers something when the band leaves room', () => {
+    expect(goalScenarios(egypt, cap, 13.6, band).length).toBeGreaterThan(0);
+  });
+
+  it('offers a slow plan rather than an unliveable one when money is tight', () => {
+    // Pool 700 against a floor costing 620: only 80 a month is genuinely
+    // free. The honest answer is a very long plan, not a fast impossible one.
+    const tight: Capacity = { ...cap, poolBeforeGoal: 700 };
+    const out = goalScenarios(egypt, tight, 13.6, band);
+    for (const s of out) {
+      expect(s.requirement.maxDailyAed).toBeGreaterThanOrEqual(band.min - 1e-6);
+      expect(s.months).toBeGreaterThan(cap.daysInMonth);
+    }
+  });
+
+  it('offers nothing at all when the floor alone exceeds the pool', () => {
+    const broke: Capacity = { ...cap, poolBeforeGoal: 400 };
+    expect(goalScenarios(egypt, broke, 13.6, band)).toEqual([]);
+  });
+
+  it('keeps working with no band declared', () => {
+    expect(goalScenarios(egypt, cap, 13.6, null).length).toBeGreaterThan(0);
+  });
+});

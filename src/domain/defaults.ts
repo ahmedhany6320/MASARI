@@ -26,6 +26,23 @@ export const DEFAULT_CATEGORY_NAMES: Omit<Category, 'id'>[] = [
 ];
 
 /**
+ * The obligations a new ledger starts with.
+ *
+ * Seeded rather than left empty because an app that opens with no commitments
+ * quietly reports the whole salary as available, which is wrong for everyone
+ * and dangerously wrong as a first impression. Every figure here is a plan the
+ * user edits, and the amounts are only ever a starting point — what actually
+ * gets paid is recorded separately, and the difference goes to the goal.
+ */
+export const DEFAULT_COMMITMENTS: { ar: string; en: string; amt: number; day: number }[] = [
+  { ar: 'الإيجار', en: 'Rent', amt: 1800, day: 1 },
+  { ar: 'الإنترنت', en: 'Internet', amt: 300, day: 18 },
+];
+
+/** The monthly transfer home, as a plan. */
+export const DEFAULT_PLANNED_TRANSFER = 850;
+
+/**
  * A brand-new, empty ledger.
  *
  * Unlike the prototype — which shipped one specific person's real figures as

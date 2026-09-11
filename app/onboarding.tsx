@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { uuid as newId } from '../src/lib/id';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RestoreBackup } from '../src/components/RestoreBackup';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../src/components/ui';
-import { parseAmount } from '../src/domain';
+import {
+  DEFAULT_COMMITMENTS,
+  DEFAULT_PLANNED_TRANSFER,
+  parseAmount,
+} from '../src/domain';
 import { useLocalization, usePalette } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 import { FONT, SPACE } from '../src/theme/tokens';
@@ -67,20 +72,40 @@ export default function OnboardingScreen() {
       cardSetup: hasCard
         ? { stmt0: stmtVal, unbilled0: unbilledVal, instBal: instBalVal, instMo: instMoVal }
         : null,
-      commits:
-        commitVal > 0
-          ? [
-              {
-                id: 'seed_commit',
-                ar: 'التزامات شهرية',
-                en: 'Monthly commitments',
-                amt: commitVal,
-                day: 1,
-                paused: false,
-                paidMonth: false,
-              },
-            ]
-          : [],
+      /*
+       * A monthly transfer home is seeded as a plan. It is the obligation most
+       * easily forgotten and the one that most distorts the daily limit when
+       * it is, since it leaves in a single lump near the end of the month.
+       */
+      planTf: [{ id: newId(), amt: DEFAULT_PLANNED_TRANSFER, day: 20 }],
+      /*
+       * Rent and internet are seeded as separate lines rather than one lump,
+       * because they fall due on different days and are settled separately —
+       * which is exactly what the reminders and the planned-versus-actual
+       * tracking need in order to say anything useful.
+       */
+      commits: [
+        ...DEFAULT_COMMITMENTS.map((c) => ({
+          id: newId(),
+          ar: c.ar,
+          en: c.en,
+          amt: c.amt,
+          day: c.day,
+          paused: false,
+          paidMonth: false,
+        })),
+        ...(commitVal > 0
+          ? [{
+              id: newId(),
+              ar: 'التزامات أخرى',
+              en: 'Other commitments',
+              amt: commitVal,
+              day: 1,
+              paused: false,
+              paidMonth: false,
+            }]
+          : []),
+      ],
     });
   }
 

@@ -26,4 +26,6 @@ export * from './adaptive';
 export * from './spendPlan';
 export * from './floor';
 export * from './adaptiveDaily';
+export * from './variance';
+export * from './forecast';
 export * from './defaults';

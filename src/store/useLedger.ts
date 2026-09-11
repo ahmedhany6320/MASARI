@@ -33,6 +33,13 @@ export interface Reminders {
   eveningHour: number;
   /** Heads-up on commitments falling due. */
   commitments: boolean;
+  /** Frequent prompts to record spending while it is still remembered. */
+  logSpending: boolean;
+  /** Hours between those prompts. */
+  logEveryHours: number;
+  /** The window they fire in, inclusive. */
+  logFromHour: number;
+  logToHour: number;
 }
 
 /** Settings live alongside the ledger but are deliberately not part of it. */
@@ -73,6 +80,14 @@ export interface LedgerStore {
   updateCommitment: (id: string, patch: Partial<Commitment>) => void;
   /** Mark a commitment settled (or not) FOR THE CURRENT CYCLE. */
   setCommitmentPaid: (id: string, paid: boolean) => void;
+  /**
+   * Settle a commitment for this cycle at what it ACTUALLY cost, recording the
+   * payment so it appears in history. The difference from the planned figure
+   * flows to the goal.
+   */
+  settleCommitment: (id: string, actual: number, acct?: Account) => void;
+  /** Mark this cycle's planned transfer as satisfied by what was really sent. */
+  setTransferSent: (id: string, sent: boolean) => void;
   removeCommitment: (id: string) => void;
 
   addGoal: (g: Omit<Goal, 'id'>) => void;
@@ -166,6 +181,10 @@ const DEFAULT_SETTINGS: Settings = {
     evening: true,
     eveningHour: 21,
     commitments: true,
+    logSpending: true,
+    logEveryHours: 2,
+    logFromHour: 9,
+    logToHour: 23,
   },
 };
 
@@ -231,6 +250,43 @@ export const useLedger = create<LedgerStore>()(
 
       addCommitment: (c) =>
         set((s) => ({ ledger: { ...s.ledger, commits: [...s.ledger.commits, { ...c, id: newId() }] } })),
+      settleCommitment: (id, actual, acct = 'bank') => {
+        const c = get().ledger.commits.find((k) => k.id === id);
+        if (!c) return;
+        const cycle = cycleKey(new Date());
+
+        // Recorded as a real expense, tagged with the commitment so the daily
+        // allowance does not charge it a second time.
+        get().addTx({
+          ts: Date.now(),
+          type: 'expense',
+          acct,
+          amt: actual,
+          m: c.ar,
+          mEn: c.en,
+          commitId: id,
+        });
+
+        set((st) => ({
+          ledger: {
+            ...st.ledger,
+            commits: st.ledger.commits.map((k) =>
+              k.id === id ? { ...k, paidFor: cycle, paidMonth: true, actual } : k,
+            ),
+          },
+        }));
+      },
+
+      setTransferSent: (id, sent) =>
+        set((st) => ({
+          ledger: {
+            ...st.ledger,
+            planTf: st.ledger.planTf.map((tf) =>
+              tf.id === id ? { ...tf, sentFor: sent ? cycleKey(new Date()) : null } : tf,
+            ),
+          },
+        })),
+
       setCommitmentPaid: (id, paid) =>
         set((st) => ({
           ledger: {

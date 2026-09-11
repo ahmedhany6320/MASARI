@@ -9,6 +9,7 @@ import {
   type TargetAdaptation,
 } from './adaptiveDaily';
 import { commitmentsDue, type CommitmentsDue } from './commitments';
+import { varianceReport, type VarianceReport } from './variance';
 import { fundedGoals, fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
 import {
@@ -39,6 +40,11 @@ export interface SafeSpend {
   commitObl: number;
   /** Every commitment's standing this cycle: due date, state, what it claims. */
   commitments: CommitmentsDue;
+  /**
+   * Planned versus actual on every obligation, and the surplus or shortfall
+   * that difference hands to the goal.
+   */
+  variance: VarianceReport;
   /** Everything the card will demand: statement + unbilled + this month's installment. */
   cardObl: number;
   /**
@@ -209,6 +215,14 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const commitObl = commitments.total;
 
   /*
+   * What obligations actually cost, against what they were budgeted. The
+   * difference is the goal's in both directions: a bill that came in under
+   * plan leaves money the salary had already given up, and one that came in
+   * over has to be paid for from somewhere.
+   */
+  const variance = varianceReport(s, now);
+
+  /*
    * A baseline set during THIS cycle means the user declared their real
    * position part-way through the month: spending before that moment is
    * already reflected in the balances they stated, so it is taken from
@@ -338,10 +352,17 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   // target-driven schedule would have demanded" — the price of staying livable.
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
 
+  /*
+   * Commitment settlements are excluded. Paying the rent is real spending and
+   * belongs in history and in the category breakdown, but the salary already
+   * gave it up as a claim — charging the payment here as well would take the
+   * same 1,800 out of the living allowance twice and leave the month looking
+   * ruined the day the rent clears.
+   */
   const cycleSpend =
     spentBefore +
     s.tx
-      .filter((x) => x.type === 'expense' && x.ts >= countFrom)
+      .filter((x) => x.type === 'expense' && x.ts >= countFrom && x.commitId == null)
       .reduce((a, x) => a + x.amt, 0);
 
   /*
@@ -380,7 +401,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   // Today's spending is likewise counted only from the baseline forward.
   const todayFrom = baseTs != null ? Math.max(dayStart, baseTs) : dayStart;
   const flexToday = s.tx
-    .filter((x) => x.type === 'expense' && x.ts >= todayFrom)
+    .filter((x) => x.type === 'expense' && x.ts >= todayFrom && x.commitId == null)
     .reduce((a, x) => a + x.amt, 0);
 
   /*
@@ -434,6 +455,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     goals,
     commitObl,
     commitments,
+    variance,
     cardObl,
     cardDue,
     cardDueParts: {
@@ -466,9 +488,12 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
       steering != null
         ? adaptTarget(
             steering,
-            // What the goal actually receives: its monthly share, plus the half
-            // of any underspend the loop banked to it.
-            goalReq + (daily?.bankedToGoal ?? 0),
+            /*
+             * Everything the goal actually receives this month: its monthly
+             * share, the half of any underspend the loop banked to it, and the
+             * surplus left by obligations that came in under budget.
+             */
+            goalReq + (daily?.bankedToGoal ?? 0) + variance.toGoal,
             steering.months ?? 0,
             steering.alloc,
             fx,

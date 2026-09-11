@@ -79,6 +79,15 @@ export interface Tx {
   rate?: number;
   /** For `remit`: who it went to. */
   to?: string;
+  /**
+   * Set when this entry settles a commitment.
+   *
+   * Such an expense is real and belongs in history and in the category
+   * breakdown, but it must NOT reduce the daily living allowance: the salary
+   * already had the commitment deducted from it as a claim, so counting the
+   * payment again would charge the same rent twice.
+   */
+  commitId?: string;
 }
 
 export interface Category {
@@ -107,6 +116,16 @@ export interface Commitment {
    * so a bill ticked once stayed ticked forever and left the daily limit.
    */
   paidFor?: string | null;
+  /**
+   * What was ACTUALLY paid for the cycle in `paidFor`, when it differed from
+   * `amt`.
+   *
+   * `amt` is the plan and this is the outcome. A bill budgeted at 300 and paid
+   * at 250 leaves 50 that belongs to the goal; paid at 340 it takes 40 away.
+   * Keeping both means the plan stays a stable figure to budget against while
+   * the goal still tracks what really happened.
+   */
+  actual?: number | null;
 }
 
 /** `owe` = you owe them. `owed` = they owe you. */
@@ -203,8 +222,14 @@ export interface OvertimeEntry {
 /** A planned (not yet executed) international transfer. */
 export interface PlannedTransfer {
   id: string;
+  /** The monthly plan. What the salary is budgeted to give up. */
   amt: number;
   day: number | null;
+  /**
+   * The cycle this plan was satisfied in, as 'YYYY-MM'. Like a commitment's
+   * `paidFor`, it expires on its own so the plan returns next month.
+   */
+  sentFor?: string | null;
 }
 
 export type SalaryStatus = 'expected' | 'received';

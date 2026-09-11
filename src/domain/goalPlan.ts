@@ -244,7 +244,12 @@ export interface GoalScenario {
  * Deliberately derived from the user's actual numbers rather than from round
  * durations, so every option shown is one they could genuinely choose.
  */
-export function goalScenarios(goal: Goal, capacity: Capacity, fx: number): GoalScenario[] {
+export function goalScenarios(
+  goal: Goal,
+  capacity: Capacity,
+  fx: number,
+  band?: { min: number; comfort: number } | null,
+): GoalScenario[] {
   const target = goal.target ?? 0;
   const remaining = Math.max(0, target - held(goal, fx));
   if (remaining <= 0) return [];
@@ -254,14 +259,43 @@ export function goalScenarios(goal: Goal, capacity: Capacity, fx: number): GoalS
     return perMonth > 0 ? Math.ceil(remaining / perMonth) : null;
   };
 
-  const fastest = monthsFor(capacity.poolBeforeGoal);
-  const balanced = monthsFor(capacity.saving + capacity.projectedSpend * 0.25);
-  const comfortable = monthsFor(capacity.saving);
+  /*
+   * Every scenario is defined by a LIVEABLE daily spend, never by an amount
+   * saved.
+   *
+   * The previous 'fastest' plan was simply the whole pool, which is the plan
+   * where you spend nothing — and on a real ledger it produced a maximum of
+   * nine dirhams a day while a declared living floor sat right beside it. A
+   * plan nobody can follow is not an option, it is a number that discredits
+   * every other option next to it.
+   *
+   * So the fastest plan now spends at the FLOOR, the comfortable one at the
+   * top of the band, and the balanced one between them. When no band has been
+   * declared the old behaviour stands, because there is then nothing to
+   * violate.
+   */
+  const floor = Math.max(0, band?.min ?? 0);
+  const comfort = Math.max(floor, band?.comfort ?? 0);
+
+  const savingAtDaily = (daily: number) =>
+    capacity.poolBeforeGoal - daily * capacity.daysInMonth;
+
+  const fastest = monthsFor(floor > 0 ? savingAtDaily(floor) : capacity.poolBeforeGoal);
+  const balanced = monthsFor(
+    comfort > floor
+      ? savingAtDaily((floor + comfort) / 2)
+      : capacity.saving + capacity.projectedSpend * 0.25,
+  );
+  const comfortable = monthsFor(comfort > 0 ? savingAtDaily(comfort) : capacity.saving);
 
   const out: GoalScenario[] = [];
   const push = (id: GoalScenario['id'], months: number | null) => {
-    if (months == null || !Number.isFinite(months)) return;
-    out.push({ id, months, requirement: requirementFor(goal, months, capacity, fx) });
+    if (months == null || !Number.isFinite(months) || months <= 0) return;
+    const requirement = requirementFor(goal, months, capacity, fx);
+    // Belt and braces: a requirement whose implied daily spend sits under the
+    // floor is not an option however it was arrived at.
+    if (floor > 0 && requirement.maxDailyAed < floor - 1e-9) return;
+    out.push({ id, months, requirement });
   };
 
   push('fastest', fastest);

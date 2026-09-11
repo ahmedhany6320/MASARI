@@ -3,6 +3,8 @@ import { emptyLedger } from './defaults';
 import {
   commitmentReminder,
   dueCommitments,
+  dueTodayReminder,
+  logSpendingNudge,
   morningBrief,
   nearLimitAlert,
   overspendAlert,
@@ -136,5 +138,52 @@ describe('commitmentReminder', () => {
   it('uses the singular for one', () => {
     expect(commitmentReminder([commitment()], 'en')?.title).toBe('A commitment is due');
     expect(commitmentReminder([commitment()], 'ar')?.title).toBe('التزام قرّب');
+  });
+});
+
+describe('logSpendingNudge — the prompt that keeps the ledger honest', () => {
+  it('leads with what is left, not with a request', () => {
+    // A prompt carrying information gets read; one asking a favour does not.
+    const c = safeSpend({ ...emptyLedger(), base: 11000 }, 13.6, NOW);
+    const n = logSpendingNudge(c, 'ar');
+    expect(n.title).toContain('باقي');
+    expect(n.body.length).toBeGreaterThan(0);
+  });
+
+  it('works in both languages', () => {
+    const c = safeSpend({ ...emptyLedger(), base: 11000 }, 13.6, NOW);
+    expect(logSpendingNudge(c, 'en').title).toContain('left today');
+  });
+});
+
+describe('dueTodayReminder', () => {
+  const rent = {
+    id: 'r', ar: 'الإيجار', en: 'Rent', amt: 1800,
+    day: NOW.getDate(), paused: false, paidMonth: false,
+  };
+
+  it('names the commitment falling due today', () => {
+    const msg = dueTodayReminder([rent], 'ar', NOW);
+    expect(msg?.title).toContain('الإيجار');
+  });
+
+  it('says nothing on a day with nothing due', () => {
+    expect(dueTodayReminder([{ ...rent, day: NOW.getDate() + 5 }], 'ar', NOW)).toBeNull();
+  });
+
+  it('says nothing once it is already settled', () => {
+    const cycle = `${NOW.getFullYear()}-${String(NOW.getMonth() + 1).padStart(2, '0')}`;
+    expect(dueTodayReminder([{ ...rent, paidFor: cycle }], 'ar', NOW)).toBeNull();
+  });
+
+  it('ignores a paused commitment', () => {
+    expect(dueTodayReminder([{ ...rent, paused: true }], 'ar', NOW)).toBeNull();
+  });
+
+  it('combines several falling due on the same day', () => {
+    const net = { ...rent, id: 'n', ar: 'الإنترنت', en: 'Internet', amt: 300 };
+    const msg = dueTodayReminder([rent, net], 'ar', NOW);
+    expect(msg?.title).toContain('الإيجار');
+    expect(msg?.title).toContain('الإنترنت');
   });
 });
