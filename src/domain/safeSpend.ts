@@ -119,6 +119,17 @@ export interface SafeSpend {
   daily: DailyAdaptation | null;
   /** What the steering goal is actually worth at the current pace. */
   targetAdapted: TargetAdaptation | null;
+  /**
+   * THE monthly contribution to the goal: its reserved share, plus the half of
+   * any underspend the daily loop banked, plus whatever obligations left over
+   * by coming in under budget.
+   *
+   * Every projection anywhere in the app must be built from this one figure.
+   * Five functions used to answer "where does the goal land", each from a
+   * slightly different input, and on one real ledger they produced 433,894,
+   * 409,958, 407,261, null and NaN — with two of those on the same screen.
+   */
+  goalMonthly: number;
   /** Which basis produced the figures above. */
   basis: 'salary' | 'balance' | 'goal';
   /**
@@ -435,6 +446,12 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
       })
     : null;
 
+  /*
+   * The single figure every projection is built from. Assembled here, once,
+   * so no caller can reconstruct a slightly different version of it.
+   */
+  const goalMonthly = goalReq + (daily?.bankedToGoal ?? 0) + variance.toGoal;
+
   const allowance = daily
     ? daily.today
     : planSteers
@@ -484,20 +501,10 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     basis,
     band,
     daily,
+    goalMonthly,
     targetAdapted:
       steering != null
-        ? adaptTarget(
-            steering,
-            /*
-             * Everything the goal actually receives this month: its monthly
-             * share, the half of any underspend the loop banked to it, and the
-             * surplus left by obligations that came in under budget.
-             */
-            goalReq + (daily?.bankedToGoal ?? 0) + variance.toGoal,
-            steering.months ?? 0,
-            steering.alloc,
-            fx,
-          )
+        ? adaptTarget(steering, goalMonthly, steering.months ?? 0, steering.alloc, fx)
         : null,
     plan,
     planInputs,

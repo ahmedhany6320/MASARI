@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { adaptTarget } from './adaptiveDaily';
 import { emptyLedger } from './defaults';
 import { safeSpend } from './safeSpend';
 import type { Commitment, Goal, Ledger, Tx } from './types';
@@ -298,5 +299,47 @@ describe('the cash reserve is protected before the goal', () => {
     const saved = safeSpend(withBuffer({ bufferTarget: 6000 }), FX, NOW);
     expect(saved.plan?.projected).toBeLessThan(plain.plan?.projected ?? 0);
     expect(saved.plan?.monthlyToGoal).toBeCloseTo(saved.goalReq, 6);
+  });
+});
+
+describe('there is exactly one answer to "where does the goal land"', () => {
+  const egypt: Goal = {
+    id: 'egypt', ar: 'مصر', en: 'Egypt', currency: 'EGP',
+    target: 1_100_000, alloc: 0, months: 8, extEgp: 0, auto: true,
+  };
+  const real = (): Ledger => ({
+    ...emptyLedger(), base: 11000, bankOpen: 6000,
+    minDailySpend: 20, comfortDailySpend: 40, goals: [egypt],
+    commits: [commit(1800, 1)],
+    cardSetup: { stmt0: 4982, unbilled0: 0, instBal: 0, instMo: 0, setupAt: null },
+  });
+
+  it('assembles the monthly contribution from every source, once', () => {
+    const c = safeSpend(real(), FX, NOW);
+    // Reserved share + banked underspend + obligation surplus. Five functions
+    // used to each rebuild their own version of this, and on this exact
+    // ledger they produced 433,894, 409,958, 407,261, null and NaN.
+    expect(c.goalMonthly).toBeCloseTo(
+      c.goalReq + (c.daily?.bankedToGoal ?? 0) + c.variance.toGoal,
+      6,
+    );
+  });
+
+  it('projects the headline from that same figure', () => {
+    const c = safeSpend(real(), FX, NOW);
+    const expected = adaptTarget(c.goals[0]!, c.goalMonthly, 8, c.goals[0]!.alloc, FX);
+    expect(c.targetAdapted?.adapted).toBeCloseTo(expected.adapted, 6);
+  });
+
+  it('moves every projection together when the contribution moves', () => {
+    const lean = safeSpend(real(), FX, NOW);
+    const richer = safeSpend({ ...real(), base: 16000 }, FX, NOW);
+    expect(richer.goalMonthly).toBeGreaterThan(lean.goalMonthly);
+    expect(richer.targetAdapted?.adapted).toBeGreaterThan(lean.targetAdapted?.adapted ?? 0);
+  });
+
+  it('never reports a landing above the aspiration', () => {
+    const rich = safeSpend({ ...real(), base: 200_000 }, FX, NOW);
+    expect(rich.targetAdapted?.adapted).toBeLessThanOrEqual(1_100_000);
   });
 });

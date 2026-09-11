@@ -9,10 +9,9 @@ import {
   formatAmount,
   goalPlan,
   goalScenarios,
-  horizonTracker,
+  adaptTarget,
   isEgpGoal,
   parseAmount,
-  projectGoal,
   requirementFor,
   type GoalMode,
 } from '../src/domain';
@@ -92,19 +91,33 @@ export default function GoalPlanScreen() {
 
   const mode: GoalMode = ledger.goalMode?.[goal.id] ?? 'horizon';
   const outlook = adaptiveOutlook(goal, capacity, minDaily, fxRate);
-  const track = horizonTracker(
-    goal,
-    capacity,
-    minDaily,
-    horizon,
-    fxRate,
-    now,
-    spend.flexToday,
-    spend.allowance,
-  );
+  /*
+   * Both the landing figure and the "where does my money get me" card are now
+   * derived from the engine's single monthly contribution, at whatever horizon
+   * the slider is on.
+   *
+   * They used to come from `horizonTracker` and `projectGoal`, each with its
+   * own idea of what was being saved. On one real ledger that produced 407,261
+   * here while Home showed 433,894 and 409,958 — three answers to one question,
+   * two of them on the same screen.
+   */
+  const landing = adaptTarget(goal, spend.goalMonthly, horizon, goal.alloc, fxRate);
+
+  /*
+   * The what-ifs are variations on the SAME base, not separate models: each is
+   * the canonical monthly contribution plus whatever a different daily spend
+   * would free up. Computing them independently is what let them drift apart.
+   */
+  const daysInMonth = capacity.daysInMonth;
+  const freedBy = (daily: number) => Math.max(0, spend.allowance - daily) * daysInMonth;
+  const atFloor = adaptTarget(goal, spend.goalMonthly + freedBy(spend.band.min), horizon, goal.alloc, fxRate);
+  const atZero = adaptTarget(goal, spend.goalMonthly + freedBy(0), horizon, goal.alloc, fxRate);
+  // What one dirham a day, sustained across the horizon, is worth at the end.
+  const perDirhamPerDay = (egpRate: number) => egpRate * daysInMonth * horizon;
+
+  const targetDate = new Date(now.getFullYear(), now.getMonth() + horizon, now.getDate());
 
   const plan = goalPlan(goal, capacity, fxRate, now);
-  const at = projectGoal(goal, capacity, fxRate, horizon);
   const req = requirementFor(goal, horizon, capacity, fxRate);
   // Bounded by the living band, so no option can imply a day nobody survives.
   const scenarios = goalScenarios(goal, capacity, fxRate, spend.band);
@@ -257,25 +270,25 @@ export default function GoalPlanScreen() {
               formatValue={(v) => `${num(v)} ${t('monthsW')}`}
             />
 
-            <Text style={[styles.hero, { color: track.reachesAspiration ? p.positive : p.accent, textAlign: rtl ? 'right' : 'left' }]}>
-              {fmt(track.projected)}
+            <Text style={[styles.hero, { color: landing.reachesOriginal ? p.positive : p.accent, textAlign: rtl ? 'right' : 'left' }]}>
+              {fmt(landing.adapted)}
             </Text>
             <Caption>
-              {t('byDate')} {MONTHS[lang][track.targetDate.getMonth()]} {track.targetDate.getFullYear()}
+              {t('byDate')} {MONTHS[lang][targetDate.getMonth()]} {num(targetDate.getFullYear())}
             </Caption>
 
             <View style={{ marginTop: SPACE.md }}>
-              <Meter ratio={track.progress} color={track.reachesAspiration ? p.positive : p.accent} />
+              <Meter ratio={landing.progress} color={landing.reachesOriginal ? p.positive : p.accent} />
               <Row
                 label={t('percentOfGoal')}
-                value={`${num(Math.round(track.progress * 100))}%`}
-                valueColor={track.reachesAspiration ? p.positive : p.warn}
+                value={`${num(Math.round(landing.progress * 100))}%`}
+                valueColor={landing.reachesOriginal ? p.positive : p.warn}
               />
-              {!track.reachesAspiration && (
-                <Row label={t('gapVsAspiration')} value={fmt(track.gap)} valueColor={p.negative} />
+              {!landing.reachesOriginal && (
+                <Row label={t('gapVsAspiration')} value={fmt(landing.shortfall)} valueColor={p.negative} />
               )}
-              <Row label={t('ifSpendFloor')} value={fmt(track.projectedAtFloor)} />
-              <Row label={t('ifSpendNothing')} value={fmt(track.projectedIfNoSpend)} valueColor={p.positive} />
+              <Row label={t('ifSpendFloor')} value={fmt(atFloor.adapted)} />
+              <Row label={t('ifSpendNothing')} value={fmt(atZero.adapted)} valueColor={p.positive} />
             </View>
 
             {/* The lever that makes the number feel controllable. */}
@@ -285,7 +298,7 @@ export default function GoalPlanScreen() {
                 <Row
                   key={cut}
                   label={`${t('spendLess')} ${money(cut)} / ${t('dayW')}`}
-                  value={`+ ${fmt(track.perDirhamPerDay * cut)}`}
+                  value={`+ ${fmt(perDirhamPerDay(egp ? fxRate : 1) * cut)}`}
                   valueColor={p.positive}
                 />
               ))}
@@ -355,19 +368,19 @@ export default function GoalPlanScreen() {
           />
 
           <View style={{ marginTop: SPACE.sm }}>
-            <Meter ratio={at.progress} color={at.reached ? p.positive : p.warn} />
+            <Meter ratio={landing.progress} color={landing.reachesOriginal ? p.positive : p.warn} />
             <Row
               label={`${t('after')} ${num(horizon)} ${t('monthsW')}`}
-              value={fmt(at.amount)}
-              valueColor={at.reached ? p.positive : p.ink}
+              value={fmt(landing.adapted)}
+              valueColor={landing.reachesOriginal ? p.positive : p.ink}
             />
             <Row
               label={t('percentOfGoal')}
-              value={`${num(Math.round(at.progress * 100))}%`}
-              valueColor={at.reached ? p.positive : p.warn}
+              value={`${num(Math.round(landing.progress * 100))}%`}
+              valueColor={landing.reachesOriginal ? p.positive : p.warn}
             />
-            {!at.reached && (
-              <Row label={t('stillMissing')} value={fmt(at.shortfall)} valueColor={p.negative} />
+            {!landing.reachesOriginal && (
+              <Row label={t('stillMissing')} value={fmt(landing.shortfall)} valueColor={p.negative} />
             )}
           </View>
         </Card>

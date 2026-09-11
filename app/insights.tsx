@@ -62,7 +62,14 @@ export default function InsightsScreen() {
    * month's projected spending. Using the month-to-date figure instead would
    * read as near-zero before payday and make every projection nonsense.
    */
-  const capacity = Math.max(0, c.livingPool - burn.projectedMonth);
+  /*
+   * The monthly contribution comes from the engine, not from a local estimate.
+   * This used to be `livingPool − projectedMonth`, which is a different notion
+   * of saving from the one the goal actually receives — so this screen
+   * projected a fourth landing figure, disagreeing with Home and with the goal
+   * plan. Everything projects from one number now.
+   */
+  const capacity = c.goalMonthly;
 
   return (
     <Screen>

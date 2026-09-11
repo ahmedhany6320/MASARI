@@ -75,6 +75,7 @@ export default function HomeScreen() {
             plan={c.plan}
             goal={steeringGoalNow}
             projectedAtPace={c.planProjected}
+            landing={c.targetAdapted?.adapted ?? c.plan.projected}
             ladder={
               c.planInputs != null ? spendLadder(steeringGoalNow, c.plan, c.planInputs) : []
             }

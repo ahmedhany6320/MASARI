@@ -18,11 +18,19 @@ export function SpendPlanCard({
   plan,
   goal,
   projectedAtPace,
+  landing,
   ladder,
 }: {
   plan: SpendPlan;
   goal: Goal;
   projectedAtPace: number | null;
+  /**
+   * Where the goal lands, from the engine's single canonical figure. The
+   * plan's own `projected` deliberately is NOT used: it is built before the
+   * daily loop's banking and before obligation variance, so showing it beside
+   * the adapted figure put two different answers to one question on one card.
+   */
+  landing: number;
   ladder: { daily: number; landing: number; reaches: boolean }[];
 }) {
   const { t, money, num, lang, rtl } = useLocalization();
@@ -33,8 +41,7 @@ export function SpendPlanCard({
 
   // Which way actual spending has moved the landing figure. A tolerance keeps
   // rounding noise from being reported as progress.
-  const drift =
-    projectedAtPace == null ? 0 : projectedAtPace - plan.projected;
+  const drift = projectedAtPace == null ? 0 : projectedAtPace - landing;
   const driftShown = Math.abs(drift) > Math.max(1, plan.target * 1e-6);
 
   const sourceNote =
@@ -75,11 +82,11 @@ export function SpendPlanCard({
           style={{
             fontSize: FONT.large,
             fontWeight: '700',
-            color: plan.reachesTarget ? p.positive : p.warn,
+            color: landing >= plan.target ? p.positive : p.warn,
             textAlign: rtl ? 'right' : 'left',
           }}
         >
-          {fmt(plan.projected)}{' '}
+          {fmt(landing)}{' '}
           <Body style={{ fontSize: FONT.body, color: p.sub }}>
             {t('planOf')} {fmt(plan.target)}
           </Body>
@@ -87,10 +94,10 @@ export function SpendPlanCard({
         <View style={{ marginTop: SPACE.sm }}>
           <Meter ratio={plan.progress} color={plan.reachesTarget ? p.positive : p.warn} />
         </View>
-        {plan.reachesTarget ? (
+        {landing >= plan.target ? (
           <Caption style={{ color: p.positive, marginTop: SPACE.sm }}>{t('planReaches')}</Caption>
         ) : (
-          <Row label={t('planGap')} value={fmt(plan.gap)} valueColor={p.negative} />
+          <Row label={t('planGap')} value={fmt(Math.max(0, plan.target - landing))} valueColor={p.negative} />
         )}
         <Caption style={{ marginTop: SPACE.xs }}>{t('planLandsNote')}</Caption>
       </View>
