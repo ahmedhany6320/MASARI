@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardClaimBreakdown } from '../../src/components/CardClaim';
@@ -11,7 +11,7 @@ import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../sr
 import { formatShortDate } from '../../src/i18n';
 import { useLocalization, usePalette, useSafeSpend } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
-import { spendLadder, steeringGoal } from '../../src/domain';
+import { forecast, forecastFromLedger, spendLadder, steeringGoal } from '../../src/domain';
 import { FONT, SPACE } from '../../src/theme/tokens';
 import { version as APP_VERSION } from '../../package.json';
 
@@ -36,6 +36,39 @@ export default function HomeScreen() {
   // The goal steering the plan, read from the engine's funded goals so its
   // progress matches what the plan was built from.
   const steeringGoalNow = steeringGoal(c.goals);
+
+  // Two months is all Home needs: this one, and the one the next salary opens.
+  const ahead = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const plannedCommitments = ledger.commits
+      .filter((k) => !k.paused)
+      .reduce((a, k) => a + (k.amt ?? 0), 0);
+    const plannedTransfers = ledger.planTf.reduce((a, tf) => a + tf.amt, 0);
+
+    return forecast(
+      forecastFromLedger(
+        ledger,
+        {
+          bank: c.bank,
+          cash: c.cash,
+          commitObl: c.commitObl,
+          planT: c.planT,
+          cardDue: c.cardDue,
+          cardNextBill: c.cardClaim.billNext,
+          goalReq: c.goalReq,
+          livingPool: c.livingPool,
+          cycleSpend: c.cycleSpend,
+          daysLeft: c.daysLeft,
+          daysInMonth,
+        },
+        plannedCommitments,
+        plannedTransfers,
+      ),
+      2,
+      now,
+    );
+  }, [ledger, c]);
 
   // The limit is the headline, but an overspent day needs to say so plainly
   // rather than just showing zero.
@@ -260,6 +293,31 @@ export default function HomeScreen() {
               valueColor={c.tomorrow >= c.allowance ? p.positive : p.warn}
             />
           </View>
+
+          {/*
+            Where the balance actually ends up, on the first screen rather than
+            two taps away. Both figures come from the same forecast the
+            dedicated screen uses, so they cannot disagree with it.
+          */}
+          {ahead.length > 0 && (
+            <View style={{ marginTop: SPACE.lg }}>
+              <Row
+                label={t('expEndMonth')}
+                value={money(ahead[0]?.closing ?? 0)}
+                valueColor={(ahead[0]?.closing ?? 0) < 0 ? p.negative : p.ink}
+                onPress={() => router.push('/forecast')}
+              />
+              {ahead[1] != null && (
+                <Row
+                  label={t('expAfterSalary')}
+                  value={money(ahead[1].closing)}
+                  valueColor={ahead[1].closing < 0 ? p.negative : p.positive}
+                  onPress={() => router.push('/forecast')}
+                />
+              )}
+              <Caption style={{ marginTop: SPACE.xs }}>{t('expNote')}</Caption>
+            </View>
+          )}
         </Card>
 
         <Card>

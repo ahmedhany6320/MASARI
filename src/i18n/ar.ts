@@ -761,6 +761,9 @@ export const ar = {
   hzReaches: 'يوصل للهدف',
   hzShort: 'ناقص',
   hzPick: 'اعتمد المدة دي',
+  expEndMonth: 'المتوقع آخر الشهر',
+  expAfterSalary: 'المتوقع بعد الراتب الجاي',
+  expNote: 'محسوب من نفس أرقام التوقعات — اضغط تشوف الشهور الجاية كلها.',
 } as const;
 
 export type StringKey = keyof typeof ar;

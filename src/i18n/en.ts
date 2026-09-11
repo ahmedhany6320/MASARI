@@ -763,4 +763,7 @@ export const en: Record<StringKey, string> = {
   hzReaches: 'reaches the goal',
   hzShort: 'short by',
   hzPick: 'Use this duration',
+  expEndMonth: 'Expected at month end',
+  expAfterSalary: 'Expected after next salary',
+  expNote: 'From the same forecast figures — tap to see every month ahead.',
 };
