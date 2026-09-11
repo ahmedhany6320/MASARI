@@ -119,20 +119,26 @@ describe('the goal basis — fix the duration, the spend is the lever', () => {
     };
   }
 
-  it('holds the daily figure at the floor when the target is out of reach', () => {
+  it('plans at the floor when the target is out of reach', () => {
     const c = safeSpend(goalLed(), FX, NOW);
     expect(c.basis).toBe('goal');
     expect(c.plan?.source).toBe('floor');
-    expect(c.allowance).toBe(60);
-    expect(c.ssl).toBe(60);
+    expect(c.plan?.dailyAllowance).toBe(60);
   });
 
-  it('does not re-divide by the days remaining', () => {
-    // The defining difference: the same figure on day 3 and on day 28, so it
-    // is something to hold yourself to rather than a drifting estimate.
+  it('starts the month on exactly the planned figure', () => {
+    // Day one, nothing spent: the loop has no variance to react to, so it
+    // must agree with the plan rather than inventing a different number.
+    const c = safeSpend(goalLed(), FX, new Date(2026, 7, 1, 12));
+    expect(c.allowance).toBeCloseTo(60, 6);
+  });
+
+  it('keeps the PLAN figure steady while the daily figure responds', () => {
+    // The plan is the commitment and does not drift with the calendar; the
+    // daily figure is what answers back to real spending.
     const early = safeSpend(goalLed(), FX, new Date(2026, 7, 3, 12));
     const late = safeSpend(goalLed(), FX, new Date(2026, 7, 28, 12));
-    expect(early.allowance).toBe(late.allowance);
+    expect(early.plan?.dailyAllowance).toBe(late.plan?.dailyAllowance);
   });
 
   it('gives the goal everything the plan does not spend', () => {
@@ -155,19 +161,33 @@ describe('the goal basis — fix the duration, the spend is the lever', () => {
     expect(c.plan?.source).toBe('target');
     expect(c.plan?.reachesTarget).toBe(true);
     expect(c.plan?.dailyForTarget).toBeGreaterThan(60);
-    expect(c.allowance).toBe(c.plan?.dailyForTarget);
+    expect(c.plan?.dailyAllowance).toBe(c.plan?.dailyForTarget);
   });
 
   it('moves the landing figure with what is really spent', () => {
     const onPlan = safeSpend(goalLed(), FX, NOW);
-    const overspent = safeSpend(
-      goalLed({ tx: [spend(4000, EARLIER, 'bank')] }),
+    const overspent = safeSpend(goalLed({ tx: [spend(4000, EARLIER, 'bank')] }), FX, NOW);
+    expect(overspent.planProjected).toBeLessThan(onPlan.planProjected ?? 0);
+  });
+
+  it('tightens the days that remain after an overspend', () => {
+    // The answer chosen for this: the month absorbs the overspend so the goal
+    // does not, and the daily figure comes down to make that true.
+    const onPlan = safeSpend(goalLed(), FX, NOW);
+    const overspent = safeSpend(goalLed({ tx: [spend(900, EARLIER, 'bank')] }), FX, NOW);
+    expect(overspent.allowance).toBeLessThan(onPlan.allowance);
+  });
+
+  it('never tightens past the survival floor', () => {
+    const wrecked = safeSpend(
+      goalLed({ minDailySpend: 20, comfortDailySpend: 60, tx: [spend(50_000, EARLIER, 'bank')] }),
       FX,
       NOW,
     );
-    expect(overspent.planProjected).toBeLessThan(onPlan.planProjected ?? 0);
-    // The limit itself does not move — the consequence lands on the goal.
-    expect(overspent.allowance).toBe(onPlan.allowance);
+    expect(wrecked.allowance).toBe(20);
+    expect(wrecked.daily?.zone).toBe('floor');
+    // And the shortfall is charged somewhere explicit rather than vanishing.
+    expect(wrecked.daily?.goalAbsorbed).toBeGreaterThan(0);
   });
 
   it('falls back to the salary basis when no goal has a duration', () => {
@@ -192,7 +212,7 @@ describe('a planned goal steers without being switched on', () => {
     const c = safeSpend(planned(), FX, NOW);
     expect(c.basis).toBe('goal');
     expect(c.plan).not.toBeNull();
-    expect(c.allowance).toBe(60);
+    expect(c.plan?.dailyAllowance).toBe(60);
   });
 
   it('yields to an explicit salary choice', () => {
@@ -200,7 +220,6 @@ describe('a planned goal steers without being switched on', () => {
     expect(c.basis).toBe('salary');
     // The plan is still computed, so the projection can be shown either way.
     expect(c.plan).not.toBeNull();
-    expect(c.allowance).not.toBe(60);
   });
 
   it('yields to an explicit balance choice', () => {

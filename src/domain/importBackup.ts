@@ -282,6 +282,9 @@ export function importBackup(raw: unknown): ImportResult {
   const floor = num(d.minDailySpend);
   led.minDailySpend = floor != null && floor > 0 ? floor : null;
 
+  const comfort = num(d.comfortDailySpend);
+  led.comfortDailySpend = comfort != null && comfort > 0 ? comfort : null;
+
   const buffer = num(d.bufferTarget);
   led.bufferTarget = buffer != null && buffer > 0 ? buffer : null;
 

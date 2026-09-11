@@ -1,9 +1,10 @@
 import { Stack, router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Sheet, TextField } from '../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../src/components/ui';
-import { recommendBuffer, recommendFloor } from '../src/domain';
+import { parseAmount, recommendBuffer, recommendFloor } from '../src/domain';
 import { useLocalization, usePalette, useSafeSpend } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 import { FONT, SPACE } from '../src/theme/tokens';
@@ -29,6 +30,11 @@ export default function FloorScreen() {
 
   const ledger = useLedger((s) => s.ledger);
   const setMinDailySpend = useLedger((s) => s.setMinDailySpend);
+  const setComfortDailySpend = useLedger((s) => s.setComfortDailySpend);
+
+  const [bandOpen, setBandOpen] = useState(false);
+  const [minDraft, setMinDraft] = useState('');
+  const [comfortDraft, setComfortDraft] = useState('');
   const setBufferTarget = useLedger((s) => s.setBufferTarget);
 
   const now = useMemo(() => new Date(), []);
@@ -51,10 +57,36 @@ export default function FloorScreen() {
 
   const measured = advice.basis !== 'none';
 
+  function openBand() {
+    setMinDraft(ledger.minDailySpend != null ? String(ledger.minDailySpend) : '');
+    setComfortDraft(ledger.comfortDailySpend != null ? String(ledger.comfortDailySpend) : '');
+    setBandOpen(true);
+  }
+
+  const minVal = parseAmount(minDraft);
+  const comfortVal = parseAmount(comfortDraft);
+  // Both ends are required and ordered: a band is only meaningful as a pair.
+  const bandValid = minVal != null && comfortVal != null && minVal > 0 && comfortVal > minVal;
+
+  function saveBand() {
+    if (!bandValid) return;
+    setMinDailySpend(minVal);
+    setComfortDailySpend(comfortVal);
+    setBandOpen(false);
+  }
+
   function applyFloor() {
+    // Seeds the band from the measurement: the recommendation becomes the
+    // comfortable end, and the ordinary day below it becomes the minimum.
     Alert.alert(t('floorSuggest'), `${money(advice.floor)} / ${t('perDay')}`, [
       { text: t('cancel'), style: 'cancel' },
-      { text: t('floorApply'), onPress: () => setMinDailySpend(advice.floor) },
+      {
+        text: t('floorApply'),
+        onPress: () => {
+          setComfortDailySpend(advice.floor);
+          setMinDailySpend(Math.max(1, Math.min(advice.profile.typical, advice.floor * 0.5)));
+        },
+      },
     ]);
   }
 
@@ -80,6 +112,30 @@ export default function FloorScreen() {
         <View style={{ height: SPACE.lg }} />
         <Title>{t('floorT')}</Title>
         <Caption>{t('floorSub')}</Caption>
+
+        {/* The band itself comes first: it is what the daily figure is judged
+            against, and the measurement below exists to inform it. */}
+        <Card>
+          <Title>{t('bandT')}</Title>
+          <Caption>{t('bandSub')}</Caption>
+          <View style={{ marginTop: SPACE.md }}>
+            <Row
+              label={t('bandMin')}
+              value={c.band.min > 0 ? money(c.band.min) : t('notSet')}
+              valueColor={c.band.min > 0 ? p.warn : p.sub}
+              onPress={openBand}
+            />
+            <Row
+              label={t('bandComfort')}
+              value={c.band.comfort > 0 ? money(c.band.comfort) : t('notSet')}
+              valueColor={c.band.comfort > 0 ? p.positive : p.sub}
+              onPress={openBand}
+            />
+          </View>
+          <View style={{ marginTop: SPACE.md }}>
+            <Button label={t('bandSave')} variant="secondary" onPress={openBand} />
+          </View>
+        </Card>
 
         {!measured ? (
           <Card>
@@ -208,6 +264,37 @@ export default function FloorScreen() {
           </>
         )}
       </ScrollView>
+
+      <Sheet
+        visible={bandOpen}
+        title={t('bandT')}
+        onClose={() => setBandOpen(false)}
+        onSubmit={saveBand}
+        submitLabel={t('bandSave')}
+        canSubmit={bandValid}
+      >
+        <Caption>{t('bandSub')}</Caption>
+        <View style={{ height: SPACE.md }} />
+        <TextField
+          label={t('bandMin')}
+          hint={t('bandMinHint')}
+          value={minDraft}
+          onChange={setMinDraft}
+          numeric
+          big
+        />
+        <TextField
+          label={t('bandComfort')}
+          hint={t('bandComfortHint')}
+          value={comfortDraft}
+          onChange={setComfortDraft}
+          numeric
+          big
+        />
+        {!bandValid && (minDraft !== '' || comfortDraft !== '') && (
+          <Caption style={{ color: p.negative }}>{t('bandInvalid')}</Caption>
+        )}
+      </Sheet>
     </Screen>
   );
 }

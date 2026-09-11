@@ -25,4 +25,5 @@ export * from './goalPlan';
 export * from './adaptive';
 export * from './spendPlan';
 export * from './floor';
+export * from './adaptiveDaily';
 export * from './defaults';

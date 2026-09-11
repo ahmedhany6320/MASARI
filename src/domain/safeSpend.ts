@@ -1,5 +1,13 @@
 import { bankBalance, cashBalance } from './balances';
 import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPosition } from './card';
+import {
+  adaptDaily,
+  adaptTarget,
+  livingBand,
+  type DailyAdaptation,
+  type LivingBand,
+  type TargetAdaptation,
+} from './adaptiveDaily';
 import { commitmentsDue, type CommitmentsDue } from './commitments';
 import { fundedGoals, fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
@@ -95,6 +103,16 @@ export interface SafeSpend {
   allowance: number;
   /** THE number: what is still safe to spend today. */
   ssl: number;
+  /** The declared living band: survival floor and balanced level. */
+  band: LivingBand;
+  /**
+   * The daily control loop's reading. Present whenever a band is declared —
+   * this is what makes the figure answer back to real spending instead of
+   * restating the plan.
+   */
+  daily: DailyAdaptation | null;
+  /** What the steering goal is actually worth at the current pace. */
+  targetAdapted: TargetAdaptation | null;
   /** Which basis produced the figures above. */
   basis: 'salary' | 'balance' | 'goal';
   /**
@@ -242,7 +260,23 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * exactly how far it slipped and why.
    */
   const daysInMonth = new Date(Y, M + 1, 0).getDate();
-  const floorMonthly = Math.max(0, s.minDailySpend ?? 0) * daysInMonth;
+
+  /*
+   * Two floors, and they do different jobs.
+   *
+   * PLANNING aims at the comfortable end, because a plan that targets bare
+   * survival from the outset hands the goal money the user was never going to
+   * be willing to give it, and reports a month of endurance as the intended
+   * outcome. The app aims high and lets pressure push it down.
+   *
+   * The SURVIVAL end is the hard stop, enforced by the daily loop below. It is
+   * the one figure nothing is allowed to breach — not the goal, not an
+   * overspent month, not the arithmetic.
+   */
+  const band = livingBand(s.minDailySpend, s.comfortDailySpend);
+  const hasBand = band.min > 0 || band.comfort > 0;
+  const planFloorDaily = band.comfort > 0 ? band.comfort : Math.max(0, s.minDailySpend ?? 0);
+  const floorMonthly = planFloorDaily * daysInMonth;
   const basisPool = s.sslBasis === 'balance' ? bank + (cash ?? 0) : s.base;
   const poolBeforeGoal = basisPool - commitObl - planT - cardDue;
   const goals = fundedGoals(funding);
@@ -270,7 +304,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
           poolBeforeGoal: poolAfterBuffer,
           daysInMonth,
           heldAed: steering.alloc,
-          floorDaily: Math.max(0, s.minDailySpend ?? 0),
+          floorDaily: planFloorDaily,
           fx,
         }
       : null;
@@ -361,8 +395,28 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * than a negative one: the honest answer is "nothing is safe to spend", not
    * a number to chase.
    */
-  const allowance =
-    planSteers
+  /*
+   * The control loop owns the daily figure whenever a band exists.
+   *
+   * It re-derives from what was ACTUALLY spent rather than restating the plan,
+   * so an expensive week tightens the days that follow and a careful one loosens
+   * them — while the survival floor holds regardless and the goal absorbs any
+   * deficit that would otherwise breach it.
+   */
+  const daily = hasBand
+    ? adaptDaily({
+        livingBudget: Math.max(0, livingPool),
+        spent: cycleSpend,
+        daysElapsed: dom,
+        daysLeft,
+        daysInMonth,
+        band,
+      })
+    : null;
+
+  const allowance = daily
+    ? daily.today
+    : planSteers
       ? plan.dailyAllowance
       : spendable > 0
         ? (spendable + flexToday) / daysLeft
@@ -406,6 +460,20 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     allowance,
     ssl,
     basis,
+    band,
+    daily,
+    targetAdapted:
+      steering != null
+        ? adaptTarget(
+            steering,
+            // What the goal actually receives: its monthly share, plus the half
+            // of any underspend the loop banked to it.
+            goalReq + (daily?.bankedToGoal ?? 0),
+            steering.months ?? 0,
+            steering.alloc,
+            fx,
+          )
+        : null,
     plan,
     planInputs,
     planProjected:

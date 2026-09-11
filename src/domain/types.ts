@@ -281,7 +281,20 @@ export interface Ledger {
    * is what stops the arithmetic demanding an impossible lifestyle to hit a
    * date — the goal slips instead, which is the honest trade.
    */
+  /**
+   * The hard floor: the least that is survivable in a day, held even when the
+   * goal has to give way for it. The bottom of the living band.
+   */
   minDailySpend?: number | null;
+  /**
+   * The top of the living band: a balanced day rather than a tight one.
+   *
+   * A single floor cannot express "I can get by on 20 but 40 is a normal
+   * life". Without the upper figure the app has no way to tell a month that is
+   * merely tight from one that is genuinely being endured, and no way to aim
+   * for the better of the two when there is room.
+   */
+  comfortDailySpend?: number | null;
   /**
    * Cash reserve held liquid against irregular spending, protected ahead of
    * any goal. Null means the user has not opted in, and the engine reserves

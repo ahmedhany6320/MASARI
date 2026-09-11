@@ -174,3 +174,19 @@ describe('the cash reserve survives a backup', () => {
     expect(importBackup({ data: { bufferTarget: -5 } }).ledger.bufferTarget).toBeNull();
   });
 });
+
+describe('the living band survives a backup', () => {
+  const { ledger } = importBackup(real);
+
+  it('round-trips both ends', () => {
+    const back = importBackup(
+      buildBackup({ ...ledger, minDailySpend: 20, comfortDailySpend: 40 }, SETTINGS, NOW),
+    );
+    expect(back.ledger.minDailySpend).toBe(20);
+    expect(back.ledger.comfortDailySpend).toBe(40);
+  });
+
+  it('leaves the upper end unset when a backup predates it', () => {
+    expect(importBackup(real).ledger.comfortDailySpend).toBeNull();
+  });
+});

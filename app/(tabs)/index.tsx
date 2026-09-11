@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardClaimBreakdown } from '../../src/components/CardClaim';
+import { DailyLoopCard } from '../../src/components/DailyLoop';
 import { SpendPlanCard } from '../../src/components/SpendPlanCard';
 import { QuickAdd } from '../../src/components/QuickAdd';
 import { QuickAction } from '../../src/components/Tiles';
@@ -58,6 +59,17 @@ export default function HomeScreen() {
           breakdown below still explains where the pool came from, but the
           number to act on is the plan's, not a residual.
         */}
+        {/* The loop's reading leads: it is the only part of the screen that
+            reacts to what actually happened today. */}
+        {c.daily != null && (
+          <DailyLoopCard
+            daily={c.daily}
+            band={c.band}
+            target={c.targetAdapted}
+            goal={steeringGoalNow}
+          />
+        )}
+
         {c.plan != null && steeringGoalNow != null && (
           <SpendPlanCard
             plan={c.plan}
