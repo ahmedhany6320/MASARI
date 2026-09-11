@@ -139,6 +139,15 @@ export default function MoreScreen() {
             badge={goalNeedsDeadline}
           />
           <Tile
+            icon="🛟"
+            label={t('floorT')}
+            value={c.bufferTarget > 0 ? money(c.bufferHeld) : undefined}
+            valueColor={c.bufferFunded ? p.positive : p.warn}
+            hint={t('floorSub')}
+            onPress={() => router.push('/floor')}
+            badge={ledger.minDailySpend == null}
+          />
+          <Tile
             icon="🔄"
             label={t('startTodayT')}
             hint={t('startTodayTileHint')}

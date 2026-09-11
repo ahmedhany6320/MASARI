@@ -217,3 +217,67 @@ describe('a planned goal steers without being switched on', () => {
     expect(safeSpend(planned({ goals: [] }), FX, NOW).basis).toBe('salary');
   });
 });
+
+describe('the cash reserve is protected before the goal', () => {
+  const egypt: Goal = {
+    id: 'egypt', ar: 'مصر', en: 'Egypt', currency: 'EGP',
+    target: 1_100_000, alloc: 0, months: 8, extEgp: 0, auto: false,
+  };
+  const withBuffer = (over: Partial<Ledger> = {}): Ledger => ({
+    ...emptyLedger(), base: 11000, minDailySpend: 60, goals: [egypt], ...over,
+  });
+
+  it('changes nothing when no reserve is set', () => {
+    const c = safeSpend(withBuffer(), FX, NOW);
+    expect(c.bufferReq).toBe(0);
+    expect(c.bufferTarget).toBe(0);
+    expect(c.goalReq).toBeCloseTo(11000 - 60 * 31, 6);
+  });
+
+  it('takes its share from the GOAL, never from the living floor', () => {
+    // The ordering that matters: a goal taking everything above the floor
+    // leaves nothing for the days that exceed it.
+    const plain = safeSpend(withBuffer(), FX, NOW);
+    const saved = safeSpend(withBuffer({ bufferTarget: 6000 }), FX, NOW);
+
+    expect(saved.bufferReq).toBeGreaterThan(0);
+    expect(saved.goalReq).toBeLessThan(plain.goalReq);
+    // The daily limit is untouched: the reserve costs the goal time, not the
+    // user their life.
+    expect(saved.allowance).toBe(plain.allowance);
+  });
+
+  it('spreads the shortfall rather than demanding it at once', () => {
+    const c = safeSpend(withBuffer({ bufferTarget: 6000 }), FX, NOW);
+    expect(c.bufferReq).toBeCloseTo(6000 / 6, 6);
+    expect(c.bufferShort).toBe(6000);
+  });
+
+  it('counts free liquid toward it and stops once full', () => {
+    // A stock, not a permanent tax: the contribution ends by itself.
+    const c = safeSpend(withBuffer({ bufferTarget: 6000, bankOpen: 9000 }), FX, NOW);
+    expect(c.bufferHeld).toBeGreaterThanOrEqual(6000);
+    expect(c.bufferFunded).toBe(true);
+    expect(c.bufferReq).toBe(0);
+  });
+
+  it('yields to the living floor when the pool cannot cover both', () => {
+    const c = safeSpend(
+      withBuffer({ bufferTarget: 100_000, base: 2000, minDailySpend: 60 }),
+      FX,
+      NOW,
+    );
+    // 60 x 31 = 1,860 of a 2,000 pool, so at most 140 can go to the reserve.
+    expect(c.bufferReq).toBeLessThanOrEqual(2000 - 60 * 31 + 1e-6);
+    expect(c.livingPool).toBeGreaterThanOrEqual(0);
+  });
+
+  it('does not promise the goal money the reserve has taken', () => {
+    // The projection has to be built from the pool the goal actually gets,
+    // or the plan reports a landing point it is never funded to reach.
+    const plain = safeSpend(withBuffer(), FX, NOW);
+    const saved = safeSpend(withBuffer({ bufferTarget: 6000 }), FX, NOW);
+    expect(saved.plan?.projected).toBeLessThan(plain.plan?.projected ?? 0);
+    expect(saved.plan?.monthlyToGoal).toBeCloseTo(saved.goalReq, 6);
+  });
+});

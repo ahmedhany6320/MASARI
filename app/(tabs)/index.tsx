@@ -161,6 +161,14 @@ export default function HomeScreen() {
                   </View>
                 )}
 
+                {c.bufferReq > 0 && (
+                  <Row
+                    label={t('bufT')}
+                    value={`− ${money(c.bufferReq)}`}
+                    valueColor={p.accentDeep}
+                    onPress={() => router.push('/floor')}
+                  />
+                )}
                 <Row
                   label={t('goals')}
                   value={`− ${money(c.goalReq)}`}

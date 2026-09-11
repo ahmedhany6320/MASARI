@@ -66,6 +66,23 @@ export interface SafeSpend {
   goalHeldBack: number;
   /** The declared living floor, per month. Zero when none is set. */
   floorMonthly: number;
+  /**
+   * Cash reserve held back this month, ahead of any goal.
+   *
+   * The floor protects an AVERAGE day; this protects the days that are not
+   * average. Without it the goal takes every dirham above the floor, and the
+   * first irregular expense lands on an account that the plan reported as
+   * healthy — the failure that makes the whole plan untrustworthy.
+   */
+  bufferReq: number;
+  /** The reserve's target, as declared. Zero when none is set. */
+  bufferTarget: number;
+  /** Already held against it: liquid not claimed by a goal. */
+  bufferHeld: number;
+  /** Still to be set aside. Zero once it is full. */
+  bufferShort: number;
+  /** True once the reserve is fully funded and stops taking a share. */
+  bufferFunded: boolean;
   /** Salary left for living after every fixed claim. */
   livingPool: number;
   /** Spent this cycle. */
@@ -152,7 +169,17 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * typed by hand, so what a goal holds — and therefore what it still needs
    * each month — has to be resolved before the requirement is worked out.
    */
-  const funding = fundGoals(s.goals, liquid, fx);
+  /*
+   * The reserve is taken off the top of the balance, before any goal draws on
+   * it. A goal funded from the emergency fund is not funded — it is the same
+   * money counted twice, and the first irregular expense reveals it.
+   */
+  const bufferTarget = Math.max(0, s.bufferTarget ?? 0);
+  const bufferHeld = Math.min(bufferTarget, Math.max(0, liquid));
+  const bufferShort = Math.max(0, bufferTarget - bufferHeld);
+  const bufferFunded = bufferShort <= 0;
+
+  const funding = fundGoals(s.goals, liquid - bufferHeld, fx);
   const protectedAlloc = funding.funded;
   /*
    * Commitments are scheduled rather than summed. The old filter deducted
@@ -227,11 +254,20 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * not spend goes to the goal. So `goalReq` is derived from the spending
    * decision rather than competing with it.
    */
+  // Spread over six months, and never at the expense of the living floor.
+  const bufferWanted = bufferShort / 6;
+  const bufferReq = Math.min(bufferWanted, Math.max(0, poolBeforeGoal - floorMonthly));
+
+  const poolAfterBuffer = Math.max(0, poolBeforeGoal - bufferReq);
+
   const steering = steeringGoal(goals);
   const planInputs: PlanInputs | null =
     steering != null
       ? {
-          poolBeforeGoal,
+          // The pool the goal can actually draw on: the reserve is filled
+          // first, so planning against the pre-reserve figure would promise a
+          // landing point the goal never receives the money to reach.
+          poolBeforeGoal: poolAfterBuffer,
           daysInMonth,
           heldAed: steering.alloc,
           floorDaily: Math.max(0, s.minDailySpend ?? 0),
@@ -248,9 +284,22 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    */
   const planSteers = plan != null && (s.sslBasis == null || s.sslBasis === 'goal');
 
+  /*
+   * The reserve is filled BEFORE the goal, never after.
+   *
+   * Ordering is the whole point. A goal that takes everything above the daily
+   * floor leaves nothing for the days that exceed it, so the plan reads
+   * healthy right up until something breaks and the money is not there.
+   * Filling the reserve first costs the goal time and costs nothing else; the
+   * reverse costs the user the ability to pay for a bad week.
+   *
+   * It is a STOCK, not a permanent tax: once `bufferHeld` reaches the target
+   * the contribution falls to zero on its own and the goal gets the full
+   * surplus again.
+   */
   const goalReq = planSteers
     ? plan.monthlyToGoal
-    : Math.min(goalAsked, Math.max(0, poolBeforeGoal - floorMonthly));
+    : Math.min(goalAsked, Math.max(0, poolAfterBuffer - floorMonthly));
   // On the goal basis this reads as "how much less the goal gets than a
   // target-driven schedule would have demanded" — the price of staying livable.
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
@@ -286,8 +335,8 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
 
   const livingPool =
     basis === 'balance'
-      ? liquid - commitObl - planT - goalReq - cardDue
-      : s.base - commitObl - planT - goalReq - cardDue;
+      ? liquid - commitObl - planT - goalReq - cardDue - bufferReq
+      : s.base - commitObl - planT - goalReq - cardDue - bufferReq;
 
   // Card spending does not touch the balance until the card is settled, and
   // that settlement is already deducted as `cardDue` — so on the balance basis
@@ -345,6 +394,11 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     goalAsked,
     goalHeldBack,
     floorMonthly,
+    bufferReq,
+    bufferTarget,
+    bufferHeld,
+    bufferShort,
+    bufferFunded,
     livingPool,
     cycleSpend,
     spendable,
@@ -356,7 +410,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     planInputs,
     planProjected:
       plan != null && steering != null
-        ? projectAtPace(plan, steering, steering.alloc, cycleSpend, poolBeforeGoal, fx)
+        ? projectAtPace(plan, steering, steering.alloc, cycleSpend, poolAfterBuffer, fx)
         : null,
     overToday,
     tomorrow,

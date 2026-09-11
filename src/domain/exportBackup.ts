@@ -67,6 +67,7 @@ export function buildBackup(
       // so including them is safe for the older app too.
       baseline: ledger.baseline ?? null,
       minDailySpend: ledger.minDailySpend ?? null,
+      bufferTarget: ledger.bufferTarget ?? null,
       goalMode: ledger.goalMode ?? {},
       sslBasis: ledger.sslBasis ?? 'salary',
     },

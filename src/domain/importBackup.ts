@@ -282,6 +282,9 @@ export function importBackup(raw: unknown): ImportResult {
   const floor = num(d.minDailySpend);
   led.minDailySpend = floor != null && floor > 0 ? floor : null;
 
+  const buffer = num(d.bufferTarget);
+  led.bufferTarget = buffer != null && buffer > 0 ? buffer : null;
+
   if (d.baseline && typeof d.baseline === 'object') {
     const b = d.baseline as Record<string, unknown>;
     const ts = num(b.ts);

@@ -197,6 +197,20 @@ export default function GoalPlanScreen() {
                 valueColor={p.warn}
               />
             )}
+            {spend.bufferReq > 0 && (
+              <Row label={t('bufMonthly')} value={money(spend.bufferReq)} valueColor={p.accentDeep} />
+            )}
+          </View>
+
+          {/* Typing a floor from memory is the thing this replaces, so the
+              measured alternative sits directly beside the field. */}
+          <View style={{ marginTop: SPACE.md }}>
+            <Button
+              label={t('floorT')}
+              variant="secondary"
+              onPress={() => router.push('/floor')}
+            />
+            <Caption style={{ marginTop: SPACE.xs }}>{t('floorSub')}</Caption>
           </View>
           {spend.goalHeldBack > 0 && (
             <Caption style={{ marginTop: SPACE.sm, color: p.warn }}>{t('heldBackNote')}</Caption>

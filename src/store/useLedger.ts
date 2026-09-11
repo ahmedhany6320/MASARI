@@ -130,6 +130,8 @@ export interface LedgerStore {
   setSavingsTarget: (target: number | null) => void;
   /** The least the user can live on per day — goals may never breach it. */
   setMinDailySpend: (amount: number | null) => void;
+  /** Cash reserve held liquid against irregular spending. */
+  setBufferTarget: (amount: number | null) => void;
   /** How a goal is pursued: fixed amount+date, stretch the date, or fix the date. */
   setGoalMode: (goalId: string, mode: 'fixed' | 'stretch' | 'horizon') => void;
   /** Choose whether the daily limit is sized from the salary or the balance. */
@@ -378,6 +380,14 @@ export const useLedger = create<LedgerStore>()(
           ledger: { ...s.ledger, salStatus, salActual: salActual ?? s.ledger.salActual },
         })),
       setSavingsTarget: (savTarget) => set((s) => ({ ledger: { ...s.ledger, savTarget } })),
+
+      setBufferTarget: (amount) =>
+        set((st) => ({
+          ledger: {
+            ...st.ledger,
+            bufferTarget: amount != null && amount > 0 ? amount : null,
+          },
+        })),
 
       setMinDailySpend: (minDailySpend) =>
         set((s) => ({

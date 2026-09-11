@@ -69,6 +69,7 @@ export function emptyLedger(makeId: () => string = defaultId): Ledger {
     // clears them: `JSON.stringify` drops undefined keys, which would leave a
     // stale value to be merged back in on the next launch.
     minDailySpend: null,
+    bufferTarget: null,
     baseline: null,
     goalMode: {},
     // Deliberately NOT set: absent means automatic, which lets a goal with a

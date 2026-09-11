@@ -282,6 +282,12 @@ export interface Ledger {
    * date — the goal slips instead, which is the honest trade.
    */
   minDailySpend?: number | null;
+  /**
+   * Cash reserve held liquid against irregular spending, protected ahead of
+   * any goal. Null means the user has not opted in, and the engine reserves
+   * nothing — the pre-buffer behaviour.
+   */
+  bufferTarget?: number | null;
 
   /**
    * How each goal is pursued. See `GoalMode` in `adaptive.ts`:

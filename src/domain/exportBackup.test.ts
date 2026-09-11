@@ -160,3 +160,17 @@ describe('the goal basis survives a backup', () => {
     expect(back.ledger.sslBasis).toBe('goal');
   });
 });
+
+describe('the cash reserve survives a backup', () => {
+  const { ledger } = importBackup(real);
+
+  it('round-trips', () => {
+    const back = importBackup(buildBackup({ ...ledger, bufferTarget: 7500 }, SETTINGS, NOW));
+    expect(back.ledger.bufferTarget).toBe(7500);
+  });
+
+  it('treats a missing or nonsense value as no reserve', () => {
+    expect(importBackup(real).ledger.bufferTarget).toBeNull();
+    expect(importBackup({ data: { bufferTarget: -5 } }).ledger.bufferTarget).toBeNull();
+  });
+});
