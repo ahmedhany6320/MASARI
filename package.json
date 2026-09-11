@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "pin-runtime": "node scripts/pin-runtime.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
