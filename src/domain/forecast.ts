@@ -28,7 +28,16 @@ export interface ForecastMonth {
   transfers: number;
   /** Card settlement leaving it. */
   card: number;
-  /** Set aside toward goals. */
+  /**
+   * Earmarked toward goals this month.
+   *
+   * Deliberately NOT subtracted from the balance. An auto-funded goal is money
+   * that stays in the account and is merely spoken for; treating it as an
+   * outflow made the closing balance identical whether or not the user had any
+   * obligations, since the goal silently absorbed whatever they did not take.
+   * Money that genuinely leaves for a goal leaves as a TRANSFER, and is
+   * counted on that line.
+   */
   goal: number;
   /** Ordinary living spend. */
   living: number;
@@ -85,7 +94,8 @@ export function forecast(inp: ForecastInputs, months: number, now: Date = new Da
     const goal = inp.goal;
 
     const opening = balance;
-    const closing = opening + salary - commitments - transfers - card - goal - living;
+    // Only real outflows move the balance. `goal` is an earmark within it.
+    const closing = opening + salary - commitments - transfers - card - living;
     saved += goal;
     balance = closing;
 

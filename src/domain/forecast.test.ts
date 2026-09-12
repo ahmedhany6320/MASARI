@@ -41,8 +41,21 @@ describe('forecast — the current month is already part spent', () => {
   });
 
   it('closes this month on arithmetic anyone can check by hand', () => {
-    // 6000 − 300 − 0 − 4982 − 4000 − 700
-    expect(f[0]?.closing).toBe(6000 - 300 - 0 - 4982 - 4000 - 700);
+    // 6000 − 300 − 0 − 4982 − 700. The goal is NOT subtracted: it is money
+    // earmarked inside the balance, not money that has left it.
+    expect(f[0]?.closing).toBe(6000 - 300 - 0 - 4982 - 700);
+  });
+
+  it('does not treat an earmarked goal as an outflow', () => {
+    // Otherwise the closing balance comes out identical with and without
+    // obligations, because the goal absorbs whatever they do not take.
+    const noGoal = forecast(inputs({ goal: 0 }), 3, NOW);
+    expect(noGoal[0]?.closing).toBe(f[0]?.closing);
+  });
+
+  it('still reports what has been earmarked', () => {
+    expect(f[0]?.goal).toBe(4000);
+    expect(f[0]?.savedToDate).toBe(4000);
   });
 });
 

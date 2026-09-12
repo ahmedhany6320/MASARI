@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardClaimBreakdown } from '../../src/components/CardClaim';
 import { DailyLoopCard } from '../../src/components/DailyLoop';
@@ -28,11 +28,12 @@ export default function HomeScreen() {
   const { t, money, num, rtl, lang } = useLocalization();
   const p = usePalette();
   const insets = useSafeAreaInsets();
-  const [showHow, setShowHow] = useState(false);
+  const [showHow, setShowHow] = useState(true);
   const [showCard, setShowCard] = useState(false);
   const [adding, setAdding] = useState(false);
 
   const ledger = useLedger((s) => s.ledger);
+  const seedObligations = useLedger((s) => s.seedObligations);
   // The goal steering the plan, read from the engine's funded goals so its
   // progress matches what the plan was built from.
   const steeringGoalNow = steeringGoal(c.goals);
@@ -88,42 +89,25 @@ export default function HomeScreen() {
         ]}
       >
         {/*
-          On the goal basis the plan IS the answer, so it leads. The salary
-          breakdown below still explains where the pool came from, but the
-          number to act on is the plan's, not a residual.
+          An empty commitment list is not "nothing is owed" — it is the salary
+          reporting itself as entirely free while the goal quietly absorbs the
+          rent. Stated before any number that depends on it.
         */}
-        {/* The loop's reading leads: it is the only part of the screen that
-            reacts to what actually happened today. */}
-        {c.daily != null && (
-          <DailyLoopCard
-            daily={c.daily}
-            band={c.band}
-            target={c.targetAdapted}
-            goal={steeringGoalNow}
-          />
+        {ledger.commits.length === 0 && (
+          <Card>
+            <Title style={{ color: p.warn }}>{t('obMissingT')}</Title>
+            <Caption>{t('obMissingB')}</Caption>
+            <View style={{ marginTop: SPACE.md }}>
+              <Button
+                label={t('obMissingBtn')}
+                onPress={() => {
+                  seedObligations();
+                  Alert.alert(t('obMissingT'), t('obMissingDone'));
+                }}
+              />
+            </View>
+          </Card>
         )}
-
-        {c.plan != null && steeringGoalNow != null && (
-          <SpendPlanCard
-            plan={c.plan}
-            goal={steeringGoalNow}
-            projectedAtPace={c.planProjected}
-            landing={c.targetAdapted?.adapted ?? c.plan.projected}
-            ladder={
-              c.planInputs != null ? spendLadder(steeringGoalNow, c.plan, c.planInputs) : []
-            }
-          />
-        )}
-
-        {/*
-          The build stamp, on the first screen rather than four taps into
-          settings. When an update "did not arrive", this is the single fact
-          that separates a code problem from a stale bundle on the device —
-          and it costs one line to never have to guess again.
-        */}
-        <Caption style={{ textAlign: rtl ? 'left' : 'right', opacity: 0.6 }}>
-          v{APP_VERSION}
-        </Caption>
 
         <Card>
           <Caption>{t('ssl')}</Caption>
@@ -250,6 +234,44 @@ export default function HomeScreen() {
             </View>
           )}
         </Card>
+
+        {/*
+          On the goal basis the plan IS the answer, so it leads. The salary
+          breakdown below still explains where the pool came from, but the
+          number to act on is the plan's, not a residual.
+        */}
+        {/* The loop's reading leads: it is the only part of the screen that
+            reacts to what actually happened today. */}
+        {c.daily != null && (
+          <DailyLoopCard
+            daily={c.daily}
+            band={c.band}
+            target={c.targetAdapted}
+            goal={steeringGoalNow}
+          />
+        )}
+
+        {c.plan != null && steeringGoalNow != null && (
+          <SpendPlanCard
+            plan={c.plan}
+            goal={steeringGoalNow}
+            projectedAtPace={c.planProjected}
+            landing={c.targetAdapted?.adapted ?? c.plan.projected}
+            ladder={
+              c.planInputs != null ? spendLadder(steeringGoalNow, c.plan, c.planInputs) : []
+            }
+          />
+        )}
+
+        {/*
+          The build stamp, on the first screen rather than four taps into
+          settings. When an update "did not arrive", this is the single fact
+          that separates a code problem from a stale bundle on the device —
+          and it costs one line to never have to guess again.
+        */}
+        <Caption style={{ textAlign: rtl ? 'left' : 'right', opacity: 0.6 }}>
+          v{APP_VERSION}
+        </Caption>
 
         {/*
           An installment balance with no monthly charge is the one case where

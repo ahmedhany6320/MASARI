@@ -4,7 +4,9 @@ import { uuid } from '../lib/id';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   cycleKey,
+  DEFAULT_COMMITMENTS,
   DEFAULT_FX_RATE,
+  DEFAULT_PLANNED_TRANSFER,
   emptyLedger,
   type Account,
   type CardConfig,
@@ -88,6 +90,16 @@ export interface LedgerStore {
   settleCommitment: (id: string, actual: number, acct?: Account) => void;
   /** Mark this cycle's planned transfer as satisfied by what was really sent. */
   setTransferSent: (id: string, sent: boolean) => void;
+  /**
+   * Creates the standard obligations for a ledger that has none.
+   *
+   * These are seeded at onboarding, but anyone who set the app up before they
+   * existed has an empty list — and an empty list is not "no obligations", it
+   * is the salary reporting itself as entirely free and the goal quietly
+   * swallowing rent money. Additive and safe to call twice: it adds only what
+   * is missing.
+   */
+  seedObligations: () => void;
   removeCommitment: (id: string) => void;
 
   addGoal: (g: Omit<Goal, 'id'>) => void;
@@ -276,6 +288,33 @@ export const useLedger = create<LedgerStore>()(
           },
         }));
       },
+
+      seedObligations: () =>
+        set((st) => {
+          const existing = st.ledger.commits.map((k) => k.en.toLowerCase());
+          const missing = DEFAULT_COMMITMENTS.filter(
+            (d) => !existing.includes(d.en.toLowerCase()),
+          ).map((d) => ({
+            id: newId(),
+            ar: d.ar,
+            en: d.en,
+            amt: d.amt,
+            day: d.day,
+            paused: false,
+            paidMonth: false,
+          }));
+
+          return {
+            ledger: {
+              ...st.ledger,
+              commits: [...st.ledger.commits, ...missing],
+              planTf:
+                st.ledger.planTf.length > 0
+                  ? st.ledger.planTf
+                  : [{ id: newId(), amt: DEFAULT_PLANNED_TRANSFER, day: 20 }],
+            },
+          };
+        }),
 
       setTransferSent: (id, sent) =>
         set((st) => ({

@@ -3,7 +3,7 @@
     "name": "مصاري",
     "slug": "masari",
     "scheme": "masari",
-    "version": "0.22.0",
+    "version": "0.23.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

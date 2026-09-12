@@ -794,4 +794,8 @@ export const en: Record<StringKey, string> = {
   rdGood: 'Enough data to rely on.',
   rdWhy: 'Analysis is only as good as what you record. The more you log, the truer these become.',
   rdLastMonthEmpty: 'Last month has too few entries — the comparison would mislead.',
+  obMissingT: 'Your commitments are not recorded',
+  obMissingB: 'The app sees no obligations against you, so it treats the whole salary as free and the goal takes a bigger share than it should. Add your rent, internet and monthly transfer.',
+  obMissingBtn: 'Add my commitments',
+  obMissingDone: 'Added — edit them under Plan → Commitments',
 };
