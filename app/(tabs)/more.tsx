@@ -7,6 +7,7 @@ import { ExportBackup } from '../../src/components/ExportBackup';
 import { RestoreBackup } from '../../src/components/RestoreBackup';
 import { Tile, TileGrid } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../../src/components/ui';
+import { salaryCycle } from '../../src/domain';
 import {
   useCardPosition,
   useLocalization,
@@ -51,7 +52,9 @@ export default function MoreScreen() {
   // Things that need attention, surfaced as tile badges rather than buried.
   const cardNeedsSetup = ledger.cardSetup == null && ledger.cardCfg.limit === 0;
   const goalNeedsDeadline = ledger.goals.some((g) => g.target != null && g.months == null);
-  const salaryPending = ledger.salStatus !== 'received';
+  // Scoped to this cycle: the old check read a flag that never expired, so
+  // the prompt vanished permanently after the first month it was ticked.
+  const salaryPending = salaryCycle(ledger).status !== 'received';
 
   /*
    * Erasing everything is irreversible and sits one tap from ordinary

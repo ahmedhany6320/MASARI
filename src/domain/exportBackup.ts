@@ -50,6 +50,7 @@ export function buildBackup(
       base: ledger.base,
       salStatus: ledger.salStatus,
       salActual: ledger.salActual,
+      salFor: ledger.salFor ?? null,
       otEntries: ledger.otEntries,
 
       cats: ledger.cats,

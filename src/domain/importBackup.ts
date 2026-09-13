@@ -82,6 +82,8 @@ export function importBackup(raw: unknown): ImportResult {
   led.base = num(d.base, 0) ?? 0;
   led.salStatus = d.salStatus === 'received' ? 'received' : 'expected';
   led.salActual = num(d.salActual);
+  // The cycle the salary status belongs to; without it the status never expires.
+  led.salFor = typeof d.salFor === 'string' ? d.salFor : null;
   led.savTarget = num(d.savTarget);
 
   // ---- card ---------------------------------------------------------------
@@ -147,6 +149,23 @@ export function importBackup(raw: unknown): ImportResult {
         // What was really paid, when it differed from the plan. Losing it on
         // restore threw away the variance that belongs to the goal.
         actual: num(k.actual),
+        // The settlement series. Absent on every backup written before it
+        // existed, in which case `paidFor`/`actual` remain the one month
+        // that can be recovered.
+        history: Array.isArray(k.history)
+          ? k.history
+              .map((raw) => {
+                const h = raw as Record<string, unknown>;
+                const amt = num(h.actual);
+                return {
+                  cycle: str(h.cycle),
+                  actual: amt ?? 0,
+                  ts: num(h.ts, 0) ?? 0,
+                  ...(typeof h.txId === 'string' ? { txId: h.txId } : {}),
+                };
+              })
+              .filter((h) => /^\d{4}-\d{2}$/.test(h.cycle))
+          : undefined,
       });
     }
     led.commits = out;

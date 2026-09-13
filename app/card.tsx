@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, DayPicker, Sheet, TextField } from '../src/components/fields';
 import { CardClaimBreakdown } from '../src/components/CardClaim';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../src/components/ui';
-import { parseAmount, type Account } from '../src/domain';
+import { formatShortDate } from '../src/i18n';
+import { parseAmount, statementCycle, type Account } from '../src/domain';
 import { useCardPosition, useLocalization, usePalette, useSafeSpend } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 import { SPACE } from '../src/theme/tokens';
@@ -21,7 +22,7 @@ import { SPACE } from '../src/theme/tokens';
  */
 export default function CardScreen() {
   const p = usePalette();
-  const { t, money, num } = useLocalization();
+  const { t, money, num, lang } = useLocalization();
   const insets = useSafeAreaInsets();
   const cc = useCardPosition();
   // The claim comes from the same engine the daily limit reads, so this
@@ -29,6 +30,12 @@ export default function CardScreen() {
   const claim = useSafeSpend().cardClaim;
 
   const ledger = useLedger((s) => s.ledger);
+  /*
+   * The statement and due days were collected from the user and then used by
+   * nothing at all. This is what they mean: which purchases the closed
+   * statement covers, what it demands, and by when it has to be paid.
+   */
+  const stmt = statementCycle(ledger);
   const setCardSetup = useLedger((s) => s.setCardSetup);
   const setCardConfig = useLedger((s) => s.setCardConfig);
   const reconcileCard = useLedger((s) => s.reconcileCard);
@@ -174,6 +181,27 @@ export default function CardScreen() {
             <Button label={t('payCard')} onPress={() => setSheet('pay')} disabled={cc.out <= 0} />
             <Button label={t('cardRec')} variant="secondary" onPress={() => setSheet('reconcile')} />
             {isSetUp && <Button label={t('cardSetupT')} variant="secondary" onPress={openSetup} />}
+          </View>
+        </Card>
+
+        <Card>
+          <Title>{t('stmtCycleT')}</Title>
+          <Caption>{t('stmtCycleNote')}</Caption>
+          <View style={{ marginTop: SPACE.sm }}>
+            <Row
+              label={t('stmtBilled')}
+              value={money(stmt.billed)}
+              valueColor={stmt.overdue ? p.negative : p.ink}
+            />
+            <Row label={t('stmtSinceClose')} value={money(stmt.sinceClose)} />
+            <Row label={t('stmtClosedOn')} value={formatShortDate(stmt.closedAt, lang)} />
+            <Row label={t('stmtDueOn')} value={formatShortDate(stmt.dueAt, lang)} />
+            <Row
+              label={stmt.overdue ? t('stmtOverdue') : t('stmtDaysLeft')}
+              value={num(Math.abs(stmt.daysToDue))}
+              valueColor={stmt.overdue ? p.negative : stmt.daysToDue <= 3 ? p.warn : p.ink}
+            />
+            <Row label={t('stmtNextClose')} value={formatShortDate(stmt.closesNext, lang)} />
           </View>
         </Card>
 

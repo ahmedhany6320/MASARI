@@ -10,6 +10,7 @@ import {
   emptyLedger,
   LEDGER_SCHEMA_VERSION,
   migrateState,
+  recordSettlement,
   normalizeAmount,
   normalizeMagnitude,
   type Account,
@@ -288,12 +289,13 @@ export const useLedger = create<LedgerStore>()(
       settleCommitment: (id, actual, acct = 'bank') => {
         const c = get().ledger.commits.find((k) => k.id === id);
         if (!c) return;
-        const cycle = cycleKey(new Date());
+        const now = Date.now();
+        const cycle = cycleKey(new Date(now));
 
         // Recorded as a real expense, tagged with the commitment so the daily
         // allowance does not charge it a second time.
         get().addTx({
-          ts: Date.now(),
+          ts: now,
           type: 'expense',
           acct,
           amt: actual,
@@ -301,12 +303,20 @@ export const useLedger = create<LedgerStore>()(
           mEn: c.en,
           commitId: id,
         });
+        const txId = get().ledger.tx[0]?.id;
 
         set((st) => ({
           ledger: {
             ...st.ledger,
             commits: st.ledger.commits.map((k) =>
-              k.id === id ? { ...k, paidFor: cycle, paidMonth: true, actual } : k,
+              k.id === id
+                ? // Appended to the series rather than written over it.
+                  // Settling October used to overwrite September, so the
+                  // month a bill came in under plan — and the money that
+                  // sent to the goal — stopped being answerable the moment
+                  // the next month was ticked.
+                  recordSettlement(k, { cycle, actual, ts: now, txId })
+                : k,
             ),
           },
         }));
@@ -497,7 +507,15 @@ export const useLedger = create<LedgerStore>()(
       // ---- salary ---------------------------------------------------------
       setSalaryStatus: (salStatus, salActual) =>
         set((s) => ({
-          ledger: { ...s.ledger, salStatus, salActual: salActual ?? s.ledger.salActual },
+          ledger: {
+            ...s.ledger,
+            salStatus,
+            salActual: salActual ?? s.ledger.salActual,
+            // Stamping the cycle is what makes the flag expire by itself.
+            // Without it, ticking September's salary left the app claiming
+            // every later salary had landed too.
+            salFor: salStatus === 'received' ? cycleKey(new Date()) : null,
+          },
         })),
       setSavingsTarget: (savTarget) => set((s) => ({ ledger: { ...s.ledger, savTarget } })),
 

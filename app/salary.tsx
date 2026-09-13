@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chips, Sheet, TextField } from '../src/components/fields';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../src/components/ui';
-import { overtimeTotal, parseAmount } from '../src/domain';
+import { overtimeThisCycle, parseAmount, salaryCycle } from '../src/domain';
 import { useLocalization, usePalette } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 import { SPACE } from '../src/theme/tokens';
@@ -41,8 +41,15 @@ export default function SalaryScreen() {
   const [mult, setMult] = useState<string>('1.25');
   const [actual, setActual] = useState('');
 
-  const ot = overtimeTotal(ledger.otEntries);
+  /*
+   * Overtime for THIS cycle only. It used to sum every entry ever recorded,
+   * so a good month in June was still being added to the expected salary in
+   * December.
+   */
+  const ot = overtimeThisCycle(ledger.otEntries);
   const expected = ledger.base + ot;
+  // The stored status is honoured only for the month it was stamped with.
+  const salary = salaryCycle(ledger);
 
   function saveBase() {
     const v = parseAmount(baseDraft);
@@ -113,12 +120,12 @@ export default function SalaryScreen() {
           <Row label={t('expectedTotal')} value={money(expected)} valueColor={p.ink} />
           <Row
             label={t('status')}
-            value={ledger.salStatus === 'received' ? t('received') : t('expectedStatus')}
-            valueColor={ledger.salStatus === 'received' ? p.positive : p.warn}
+            value={salary.status === 'received' ? t('received') : t('expectedStatus')}
+            valueColor={salary.status === 'received' ? p.positive : p.warn}
           />
           <Caption style={{ marginTop: SPACE.sm }}>{t('overtimeNote')}</Caption>
 
-          {ledger.salStatus !== 'received' && (
+          {salary.status !== 'received' && (
             <View style={{ marginTop: SPACE.md }}>
               <Button
                 label={t('markSalaryReceived')}

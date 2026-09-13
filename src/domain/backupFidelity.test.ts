@@ -56,6 +56,7 @@ function fullLedger(): Ledger {
     base: 9_500,
     salStatus: 'received',
     salActual: 9_712.4,
+    salFor: '2026-09',
     otEntries: [{ id: id(), h: 6.5, rate: 45, mult: 1.5, date: '2026-09-05' }],
 
     cats: [
@@ -75,6 +76,10 @@ function fullLedger(): Ledger {
         paidMonth: true,
         paidFor: '2026-09',
         actual: 1_775,
+        history: [
+          { cycle: '2026-08', actual: 1_800, ts: 1_756_000_000_000 },
+          { cycle: '2026-09', actual: 1_775, ts: 1_758_000_000_000, txId: 'id-14' },
+        ],
       },
       {
         id: net,
@@ -206,6 +211,18 @@ describe('a backup carries the whole ledger', () => {
     const g = restored!.ledger.goals.find((x) => x.id === 'egypt');
     expect(g?.currency).toBe('AED');
     expect(g?.en).toBe('Family house');
+  });
+
+  it('keeps every month a commitment was settled, not just the latest', () => {
+    expect(restored!.ledger.commits[0]?.history?.map((h) => h.cycle)).toEqual([
+      '2026-08',
+      '2026-09',
+    ]);
+    expect(restored!.ledger.commits[0]?.history?.[1]?.txId).toBe('id-14');
+  });
+
+  it('keeps the cycle the salary status belongs to', () => {
+    expect(restored!.ledger.salFor).toBe('2026-09');
   });
 
   it('keeps the reason the card was last corrected', () => {

@@ -19,6 +19,9 @@ function local(): Ledger {
   return {
     ...emptyLedger(id),
     cardAdjNote: 'رسوم تأخير',
+    salStatus: 'received',
+    salActual: 9_800,
+    salFor: '2026-09',
     otEntries: [{ id: 'ot1', h: 5, rate: 40, mult: 1.5, date: '2026-09-02' }],
     recv: [
       { id: 'r1', ar: 'بدل', en: 'Allowance', amt: 500, exact: true, status: 'expected', actual: null },
@@ -31,7 +34,14 @@ function local(): Ledger {
     bufferTarget: 1_500,
     goalMode: { egypt: 'horizon' },
     commits: [
-      { id: 'c1', ar: 'إيجار', en: 'Rent', amt: 1800, day: 1, paused: false, paidMonth: true, paidFor: '2026-09', actual: 1775 },
+      {
+        id: 'c1', ar: 'إيجار', en: 'Rent', amt: 1800, day: 1, paused: false,
+        paidMonth: true, paidFor: '2026-09', actual: 1775,
+        history: [
+          { cycle: '2026-08', actual: 1800, ts: 1 },
+          { cycle: '2026-09', actual: 1775, ts: 2 },
+        ],
+      },
     ],
     tx: [
       { id: 'x1', ts: 1_000, type: 'expense', acct: 'bank', amt: 1775, commitId: 'c1' },
@@ -76,6 +86,16 @@ describe('a pull never blanks a field the remote cannot carry', () => {
     expect(merged.comfortDailySpend).toBe(40);
     expect(merged.bufferTarget).toBe(1_500);
     expect(merged.goalMode).toEqual({ egypt: 'horizon' });
+  });
+
+  it('keeps the settlement history and the salary cycle stamp', () => {
+    expect(merged.commits.find((k) => k.id === 'c1')?.history?.map((h) => h.cycle)).toEqual([
+      '2026-08',
+      '2026-09',
+    ]);
+    // Without the stamp an unstamped status reads as current, so a pull would
+    // re-assert a salary that landed months ago.
+    expect(merged.salFor).toBe('2026-09');
   });
 
   it('keeps a settled expense tied to its commitment', () => {

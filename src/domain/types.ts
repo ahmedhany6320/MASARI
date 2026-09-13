@@ -96,6 +96,26 @@ export interface Category {
   en: string;
 }
 
+/**
+ * One month's settlement of a recurring obligation.
+ *
+ * A commitment recurs, so what was paid for it is a series, not a value. The
+ * ledger held only the latest: settling October's rent overwrote September's,
+ * so the moment a new month was settled the previous one's variance — the
+ * money that went to the goal because a bill came in under plan — could no
+ * longer be shown, explained or checked.
+ */
+export interface CommitmentSettlement {
+  /** The cycle this settles, as 'YYYY-MM'. */
+  cycle: string;
+  /** What was actually paid. */
+  actual: number;
+  /** When it was recorded, in epoch milliseconds. */
+  ts: number;
+  /** The transaction that recorded the payment, when there was one. */
+  txId?: string;
+}
+
 /** A recurring monthly obligation (rent, phone, subscriptions). */
 export interface Commitment {
   id: string;
@@ -124,8 +144,19 @@ export interface Commitment {
    * at 250 leaves 50 that belongs to the goal; paid at 340 it takes 40 away.
    * Keeping both means the plan stays a stable figure to budget against while
    * the goal still tracks what really happened.
+   *
+   * This is the CURRENT cycle's outcome only. `history` keeps the rest.
    */
   actual?: number | null;
+  /**
+   * Every cycle this was settled in, oldest first.
+   *
+   * `paidFor` and `actual` describe one month and are overwritten by the next.
+   * Without the series behind them, a bill's own record could not answer what
+   * it cost in March, whether it is drifting upward, or why the goal received
+   * what it did three months ago.
+   */
+  history?: CommitmentSettlement[];
 }
 
 /** `owe` = you owe them. `owed` = they owe you. */
@@ -280,6 +311,16 @@ export interface Ledger {
   base: number;
   salStatus: SalaryStatus;
   salActual: number | null;
+  /**
+   * The cycle `salStatus` and `salActual` belong to, as 'YYYY-MM'.
+   *
+   * Without it the status never expired: marking September's salary received
+   * left the app claiming every later salary had landed too, so the prompt to
+   * confirm it vanished permanently and one good month's `salActual` went on
+   * inflating every month after. The same shape as a commitment's `paidFor`,
+   * and for the same reason.
+   */
+  salFor?: string | null;
   otEntries: OvertimeEntry[];
 
   cats: Category[];

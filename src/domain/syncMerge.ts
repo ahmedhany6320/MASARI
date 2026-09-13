@@ -35,11 +35,12 @@ export const UNSYNCED_LEDGER_FIELDS = [
   'comfortDailySpend',
   'bufferTarget',
   'goalMode',
+  'salFor',
 ] as const;
 
 /** Per-row fields the remote columns do not cover. */
 export const UNSYNCED_TX_FIELDS = ['commitId', 'back', 'fee', 'rate', 'to'] as const;
-export const UNSYNCED_COMMITMENT_FIELDS = ['actual'] as const;
+export const UNSYNCED_COMMITMENT_FIELDS = ['actual', 'history'] as const;
 
 function keep<T extends object, K extends keyof T>(
   remoteRow: T,
@@ -91,6 +92,10 @@ export function mergeRelationalPull(remote: Ledger, local: Ledger): Ledger {
       remote.goalMode && Object.keys(remote.goalMode).length
         ? remote.goalMode
         : local.goalMode,
+    // The cycle the salary status belongs to. Without it a pulled ledger's
+    // status has no month, and an unstamped status reads as current — so a
+    // pull would re-assert a salary that landed three months ago.
+    salFor: remote.salFor ?? local.salFor,
 
     tx: remote.tx.map((x) => keep(x, localTx.get(x.id), UNSYNCED_TX_FIELDS)),
     commits: remote.commits.map((k) =>

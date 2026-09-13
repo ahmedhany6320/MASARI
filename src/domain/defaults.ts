@@ -68,6 +68,7 @@ export function emptyLedger(makeId: () => string = defaultId): Ledger {
     base: 0,
     salStatus: 'expected',
     salActual: null,
+    salFor: null,
     otEntries: [],
 
     cats: DEFAULT_CATEGORY_NAMES.map((c) => ({ ...c, id: makeId() })),

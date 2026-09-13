@@ -203,6 +203,53 @@ web export before acting.
 `app.json:47-52` declares four permissions, each once, plus a
 `blockedPermissions` list. No duplication at this commit.
 
+### D8 — Flags with no cycle attached. *(found in Phase 3, severity: high)*
+
+The lesson `paidMonth` taught was not applied everywhere. Two more fields had
+the same shape and one figure had no month at all.
+
+`salStatus` / `salActual` carried no cycle. Marking September's salary
+received left the app asserting every later salary had landed too, so the
+prompt to confirm it vanished permanently after the first month, and one
+overtime-boosted month's `salActual` went on inflating every month after it.
+Fixed with `salFor`, stamped exactly as `paidFor` is, read through
+`salaryCycle()`.
+
+`overtimeTotal(ledger.otEntries)` summed every entry ever recorded and the
+salary screen presented the total as this month's overtime, so a good June was
+still being added to the expected salary in December. Fixed with
+`overtimeThisCycle()`; the lifetime total remains available under its own name.
+
+### D9 — The statement and due days were collected and never used. *(found in Phase 3, severity: medium)*
+
+`cardCfg.closeDay` and `cardCfg.dueDay` are asked for on the card screen,
+stored, validated and displayed — and no calculation anywhere read either. The
+money was not wrong: `cardPosition` accounts for every dirham and
+`cardCarryover` separates what this cycle has counted from what it carried in.
+What was missing is *when*.
+
+It matters because the statement boundary is not the salary boundary. With a
+statement closing on the 3rd, a purchase on the 1st is on the statement that
+has already closed, while the salary cycle counts it as this month's. Treating
+them as the same date is correct only when the card closes on the 1st, which
+is a default rather than a fact.
+
+`statement.ts` derives the period, the close, the due date and what the closed
+statement actually demands. The card screen now shows it.
+
+### D10 — A commitment's history was one month deep. *(found in Phase 3, severity: medium)*
+
+`paidFor` and `actual` describe a single cycle and are overwritten by the next
+one. Settling October's rent erased September's, so the month a bill came in
+under plan — and the money that sent to the goal — stopped being answerable
+the moment the next month was ticked.
+
+`Commitment.history` is the series; `recordSettlement` appends to it and
+corrects rather than duplicating a cycle already recorded, since two
+settlements for one month would hand the goal the same variance twice. The
+single-cycle fields are kept in step so nothing reading them changed and an
+older build still loads the save.
+
 ## 5. Order of work
 
 Data protection first, then import/sync, then the engine, then the screens —
