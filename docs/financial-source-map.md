@@ -327,6 +327,35 @@ screen says plainly when what it is showing is not what the daily limit is
 working toward. The chosen goal is also funded from the balance first —
 steering by a goal the balance was starving is the opposite of choosing it.
 
+### D13 — The projection could not see what the goal already held. *(found continuing Phase 2, severity: high)*
+
+`safeSpend` resolves what actually backs each goal — an auto goal draws its
+progress from the balance rather than from a typed figure — and then handed
+`project()` the **raw** ledger, where that same goal's `alloc` is still zero.
+
+So the projection assessed a goal holding 12,800 as holding nothing. It
+demanded 1,634 a month where the goal needed 923 once its own savings were
+counted, and reported it as further from its target than it was. Fixed by
+passing the funded goals; `required-monthly` in the consistency harness now
+holds the projection's requirement against the steering goal's own schedule.
+
+### D14 — Capacity was guessed from what had been logged. *(found continuing Phase 2, severity: high)*
+
+`useCapacity` built its own picture: a second `safeSpend` call at a second
+clock reading, with the month's living estimated from `burnRate` — a
+straight-line extrapolation of however much had been recorded so far.
+
+On a ledger with two purchases logged that read as 193 a month against a
+planned 1,200, so the goal screen announced **6,327 a month of saving where
+the engine reserved 923**. Seven times over, on the headline figure of the
+screen whose whole job is that number. It also meant recording lunch restated
+what the month could put aside, which a plan must not do.
+
+`SafeSpend.capacity` is now built once, from the projection's planned living
+and the same post-reserve pool the goal reservation uses. Two consistency
+rules hold it: capacity must equal pool minus living, and must split exactly
+into the goal reservation plus the surplus.
+
 ## 5. Order of work
 
 Data protection first, then import/sync, then the engine, then the screens —

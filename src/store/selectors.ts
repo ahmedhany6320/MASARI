@@ -96,25 +96,17 @@ export function usePalette(): Palette {
  * absurdly optimistic; projecting the whole month at the observed pace is the
  * honest basis for a plan.
  */
+/**
+ * Goal-planning capacity, read from the one evaluation that produced it.
+ *
+ * This used to build its own: a second `safeSpend` call at a second clock
+ * reading, with the month's living estimated from the BURN RATE — a
+ * straight-line extrapolation of whatever had been recorded so far. With two
+ * purchases logged that read as 193 a month against a planned 1,200, so the
+ * goal screen announced 6,327 a month of saving where the engine reserved 923.
+ */
 export function useCapacity(): Capacity {
   const ledger = useLedger((s) => s.ledger);
   const fxRate = useLedger((s) => s.settings.fxRate);
-
-  return useMemo(() => {
-    const now = new Date();
-    const c = safeSpend(ledger, fxRate, now);
-    const burn = burnRate(ledger, c.livingPool, now);
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-
-    // The pool BEFORE any goal reservation: reserving for the goal and then
-    // asking what is left for the goal would be circular.
-    const poolBeforeGoal = ledger.base - c.commitObl - c.planT - c.cardDue;
-
-    return {
-      poolBeforeGoal,
-      projectedSpend: burn.projectedMonth,
-      saving: poolBeforeGoal - burn.projectedMonth,
-      daysInMonth,
-    };
-  }, [ledger, fxRate]);
+  return useMemo(() => safeSpend(ledger, fxRate, new Date()).capacity, [ledger, fxRate]);
 }

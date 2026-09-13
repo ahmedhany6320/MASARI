@@ -1,5 +1,6 @@
 import { forecast, forecastFromLedger, type ForecastMonth } from './forecast';
 import { DEFAULT_FX_RATE } from './defaults';
+import { goalMonthlyRequirement } from './goals';
 import { safeSpend, type SafeSpend } from './safeSpend';
 import type { DailyBudget, Feasibility, Projection } from './projection';
 import type { Goal, Ledger } from './types';
@@ -103,7 +104,7 @@ function check(
  * formula that made it proves nothing; checking it against a different route
  * to the same number is what catches two engines drifting apart.
  */
-export function consistencyOf(s: SafeSpend, asOf: Date): ConsistencyBreach[] {
+export function consistencyOf(s: SafeSpend, asOf: Date, fx = DEFAULT_FX_RATE): ConsistencyBreach[] {
   const out: ConsistencyBreach[] = [];
 
   if (s.projection) {
@@ -133,6 +134,51 @@ export function consistencyOf(s: SafeSpend, asOf: Date): ConsistencyBreach[] {
     s.goalMonthly,
     Math.max(0, s.goalReq + s.bankedToGoal + s.variance.toGoal - s.goalAbsorbed),
   );
+
+  /*
+   * What the month can set aside is exactly what the goal needs plus what is
+   * left over. Nothing falls through the gap between them.
+   *
+   * This is the check that would have caught the goal screen announcing 6,327
+   * a month of saving while the engine reserved 923: the two came from
+   * different pools, estimated different ways, and nothing compared them.
+   */
+  check(
+    out,
+    'capacity-splits',
+    'Capacity for saving must be exactly the goal reservation plus the surplus.',
+    s.capacity.saving,
+    s.goalReq + s.surplus,
+  );
+
+  check(
+    out,
+    'capacity-pool',
+    'Capacity must be measured after the reserve, as the goal reservation is.',
+    s.capacity.poolBeforeGoal - s.capacity.projectedSpend,
+    s.capacity.saving,
+  );
+
+  /*
+   * The projection's monthly requirement is for the STEERING goal, and must
+   * match that goal's own schedule with what it already holds counted.
+   *
+   * Not `goalAsked`, which sums every goal — that was the mistake this check
+   * caught in its own first draft. What it is really guarding is that the
+   * projection sees the FUNDED goal: it used to be handed the raw ledger,
+   * where an auto goal's `alloc` is zero because its progress comes from the
+   * balance, so it demanded 1,634 a month from a goal that needed 923.
+   */
+  const feas = s.projection?.assessment.feasibility;
+  if (s.projection && s.steering && feas !== 'unset' && feas !== 'met') {
+    check(
+      out,
+      'required-monthly',
+      "The projection's monthly requirement must be the steering goal's own schedule, counting what it already holds.",
+      s.projection.assessment.requiredMonthlyAed,
+      goalMonthlyRequirement(s.steering, fx),
+    );
+  }
 
   check(
     out,
@@ -259,6 +305,6 @@ export function evaluateFinancialState(
     ),
 
     detail,
-    consistency: consistencyOf(detail, asOf),
+    consistency: consistencyOf(detail, asOf, fx),
   };
 }

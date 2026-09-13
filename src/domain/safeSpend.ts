@@ -21,6 +21,7 @@ import {
   type PlanInputs,
   type SpendPlan,
 } from './spendPlan';
+import type { Capacity } from './goalPlan';
 import type { Goal, Ledger } from './types';
 
 /**
@@ -177,6 +178,18 @@ export interface SafeSpend {
    * the rule in one place and not the other.
    */
   steering: Goal | null;
+  /**
+   * The goal-planning capacity, built here so there is one of it.
+   *
+   * `useCapacity` used to assemble its own by calling `safeSpend` a second
+   * time at a second clock reading, and estimated the month's living from the
+   * BURN RATE — a straight-line extrapolation of however much had been
+   * recorded so far. On a ledger with two purchases logged, that read as 193 a
+   * month against a planned 1,200, so the goal screen announced 6,327 a month
+   * of saving where the engine reserved 923. Seven times over, on the
+   * headline figure of the screen whose entire job is that number.
+   */
+  capacity: Capacity;
   /** Which basis produced the figures above. */
   basis: 'salary' | 'balance' | 'goal';
   /**
@@ -361,15 +374,31 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * month does not need. Deciding the goal first and dividing the remainder
    * is how the old formula produced a daily figure nobody could live on.
    */
+  /*
+   * The goals with `alloc` resolved to what actually backs them. Everything
+   * below reads these, the projection included.
+   *
+   * The projection used to be handed the RAW ledger, where an auto goal's
+   * `alloc` is zero because its progress is drawn from the balance rather than
+   * typed in. So it assessed a goal already holding 12,800 as though it held
+   * nothing: it demanded 1,634 a month where the same goal needed 923 once its
+   * own savings were counted, and reported it as further away than it was.
+   */
+  const goals = fundedGoals(funding);
+  const goalAsked = goalsMonthlyRequirement(goals, fx);
+
   const projection = hasBand
-    ? project({ ledger: s, fx, now, range: { min: band.min, comfort: band.comfort } })
+    ? project({
+        ledger: { ...s, goals },
+        fx,
+        now,
+        range: { min: band.min, comfort: band.comfort },
+      })
     : null;
   const planFloorDaily = band.comfort > 0 ? band.comfort : Math.max(0, s.minDailySpend ?? 0);
   const floorMonthly = planFloorDaily * daysInMonth;
   const basisPool = s.sslBasis === 'balance' ? bank + (cash ?? 0) : s.base;
   const poolBeforeGoal = basisPool - commitObl - planT - cardDue;
-  const goals = fundedGoals(funding);
-  const goalAsked = goalsMonthlyRequirement(goals, fx);
 
   /*
    * On the goal basis the goal stops being a claim and becomes the residual:
@@ -629,6 +658,13 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     allowance,
     ssl,
     steering,
+    capacity: {
+      poolBeforeGoal: poolAfterBuffer,
+      // The month's PLANNED living, not a projection of what has been logged.
+      projectedSpend: projection ? projection.monthlyDiscretionary : floorMonthly,
+      saving: poolAfterBuffer - (projection ? projection.monthlyDiscretionary : floorMonthly),
+      daysInMonth,
+    },
     basis,
     band,
     daily,
