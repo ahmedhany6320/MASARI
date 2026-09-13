@@ -4,9 +4,7 @@ import { uuid } from '../lib/id';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   cycleKey,
-  DEFAULT_COMMITMENTS,
   DEFAULT_FX_RATE,
-  DEFAULT_PLANNED_TRANSFER,
   emptyLedger,
   LEDGER_SCHEMA_VERSION,
   migrateState,
@@ -104,7 +102,6 @@ export interface LedgerStore {
    * swallowing rent money. Additive and safe to call twice: it adds only what
    * is missing.
    */
-  seedObligations: () => void;
   removeCommitment: (id: string) => void;
 
   addGoal: (g: Omit<Goal, 'id'>) => void;
@@ -323,33 +320,6 @@ export const useLedger = create<LedgerStore>()(
           },
         }));
       },
-
-      seedObligations: () =>
-        set((st) => {
-          const existing = st.ledger.commits.map((k) => k.en.toLowerCase());
-          const missing = DEFAULT_COMMITMENTS.filter(
-            (d) => !existing.includes(d.en.toLowerCase()),
-          ).map((d) => ({
-            id: newId(),
-            ar: d.ar,
-            en: d.en,
-            amt: d.amt,
-            day: d.day,
-            paused: false,
-            paidMonth: false,
-          }));
-
-          return {
-            ledger: {
-              ...st.ledger,
-              commits: [...st.ledger.commits, ...missing],
-              planTf:
-                st.ledger.planTf.length > 0
-                  ? st.ledger.planTf
-                  : [{ id: newId(), amt: DEFAULT_PLANNED_TRANSFER, day: 20 }],
-            },
-          };
-        }),
 
       setTransferSent: (id, sent) =>
         set((st) => ({

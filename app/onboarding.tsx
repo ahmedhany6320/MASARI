@@ -4,11 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RestoreBackup } from '../src/components/RestoreBackup';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../src/components/ui';
-import {
-  DEFAULT_COMMITMENTS,
-  DEFAULT_PLANNED_TRANSFER,
-  parseAmount,
-} from '../src/domain';
+import { parseAmount } from '../src/domain';
 import { useLocalization, usePalette } from '../src/store/selectors';
 import { useLedger } from '../src/store/useLedger';
 import { FONT, SPACE } from '../src/theme/tokens';
@@ -36,6 +32,20 @@ export default function OnboardingScreen() {
 
   const [salary, setSalary] = useState('');
   const [bank, setBank] = useState('');
+  /*
+   * Obligations are typed, not assumed.
+   *
+   * This screen used to add Rent 1,800, Internet 300 and a transfer of 850 to
+   * every new ledger after the preview, regardless of what was entered — the
+   * author's own figures, presented to a stranger as their own. The preview
+   * above the button did not include them either, so the first number the app
+   * ever showed was one it then contradicted.
+   *
+   * Blank stays blank. Nothing here is written unless it was typed.
+   */
+  const [rent, setRent] = useState('');
+  const [internet, setInternet] = useState('');
+  const [transfer, setTransfer] = useState('');
   const [commitment, setCommitment] = useState('');
   const [cardStmt, setCardStmt] = useState('');
   const [cardUnbilled, setCardUnbilled] = useState('');
@@ -44,7 +54,11 @@ export default function OnboardingScreen() {
 
   const salaryVal = parseAmount(salary);
   const bankVal = parseAmount(bank) ?? 0;
+  const rentVal = parseAmount(rent) ?? 0;
+  const internetVal = parseAmount(internet) ?? 0;
+  const transferVal = parseAmount(transfer) ?? 0;
   const commitVal = parseAmount(commitment) ?? 0;
+  const oblTotal = rentVal + internetVal + commitVal;
   const stmtVal = parseAmount(cardStmt) ?? 0;
   const unbilledVal = parseAmount(cardUnbilled) ?? 0;
   const instBalVal = parseAmount(cardInstBal) ?? 0;
@@ -58,7 +72,8 @@ export default function OnboardingScreen() {
    * being the one part that spreads.
    */
   const cardDue = stmtVal + unbilledVal + instMoVal;
-  const pool = Math.max(0, (salaryVal ?? 0) - commitVal - cardDue);
+  // The preview subtracts exactly what will be written, and nothing else.
+  const pool = Math.max(0, (salaryVal ?? 0) - oblTotal - transferVal - cardDue);
 
   // Salary is the only genuinely required figure: without it there is no cycle
   // to divide, and the whole limit is meaningless.
@@ -73,27 +88,25 @@ export default function OnboardingScreen() {
         ? { stmt0: stmtVal, unbilled0: unbilledVal, instBal: instBalVal, instMo: instMoVal }
         : null,
       /*
-       * A monthly transfer home is seeded as a plan. It is the obligation most
-       * easily forgotten and the one that most distorts the daily limit when
-       * it is, since it leaves in a single lump near the end of the month.
+       * A transfer home is the obligation most easily forgotten and the one
+       * that most distorts the daily limit when it is, since it leaves in a
+       * single lump near the end of the month. So it is asked for — and only
+       * recorded when an amount was given.
        */
-      planTf: [{ id: newId(), amt: DEFAULT_PLANNED_TRANSFER, day: 20 }],
+      planTf: transferVal > 0 ? [{ id: newId(), amt: transferVal, day: 20 }] : [],
       /*
-       * Rent and internet are seeded as separate lines rather than one lump,
-       * because they fall due on different days and are settled separately —
-       * which is exactly what the reminders and the planned-versus-actual
-       * tracking need in order to say anything useful.
+       * Rent and internet are separate lines rather than one lump, because
+       * they fall due on different days and are settled separately — which is
+       * what the reminders and the planned-versus-actual tracking need in
+       * order to say anything useful. Each is written only if it was typed.
        */
       commits: [
-        ...DEFAULT_COMMITMENTS.map((c) => ({
-          id: newId(),
-          ar: c.ar,
-          en: c.en,
-          amt: c.amt,
-          day: c.day,
-          paused: false,
-          paidMonth: false,
-        })),
+        ...(rentVal > 0
+          ? [{ id: newId(), ar: 'الإيجار', en: 'Rent', amt: rentVal, day: 1, paused: false, paidMonth: false }]
+          : []),
+        ...(internetVal > 0
+          ? [{ id: newId(), ar: 'الإنترنت', en: 'Internet', amt: internetVal, day: 18, paused: false, paidMonth: false }]
+          : []),
         ...(commitVal > 0
           ? [{
               id: newId(),
@@ -166,7 +179,15 @@ export default function OnboardingScreen() {
           <Card>
             {field(t('salaryWork'), t('salaryHint'), salary, setSalary, true)}
             {field(t('bankAcct'), t('bankHint'), bank, setBank)}
-            {field(t('segCommit'), t('commitHint'), commitment, setCommitment)}
+          </Card>
+
+          <Card>
+            <Title>{t('obOblT')}</Title>
+            <Caption>{t('obOblNote')}</Caption>
+            {field(t('obRent'), t('obRentHint'), rent, setRent)}
+            {field(t('obInternet'), t('obInternetHint'), internet, setInternet)}
+            {field(t('obTransfer'), t('obTransferHint'), transfer, setTransfer)}
+            {field(t('obOther'), t('commitHint'), commitment, setCommitment)}
           </Card>
 
           {/*
@@ -189,7 +210,10 @@ export default function OnboardingScreen() {
               <Title>{t('obPreviewT')}</Title>
               <View style={{ marginTop: SPACE.sm }}>
                 <Row label={t('salaryWork')} value={money(salaryVal)} />
-                {commitVal > 0 && <Row label={t('segCommit')} value={`− ${money(commitVal)}`} />}
+                {oblTotal > 0 && <Row label={t('segCommit')} value={`− ${money(oblTotal)}`} />}
+                {transferVal > 0 && (
+                  <Row label={t('obTransfer')} value={`− ${money(transferVal)}`} />
+                )}
                 {cardDue > 0 && (
                   <Row
                     label={t('cardDueLabel')}

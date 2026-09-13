@@ -367,6 +367,16 @@ export const en: Record<StringKey, string> = {
   closeDay: 'Statement day',
   dueDay: 'Payment due day',
   edit: 'Edit',
+  obOblT: 'Monthly obligations',
+  obOblNote:
+    'Leave anything blank and it will not be added. You can add more later.',
+  obRent: 'Rent',
+  obRentHint: 'Paid on the 1st.',
+  obInternet: 'Internet',
+  obInternetHint: 'Paid on the 18th.',
+  obTransfer: 'Money sent home each month',
+  obTransferHint: 'Leaves near the end of the month, so it matters to the daily limit.',
+  obOther: 'Anything else, as one line',
   notSteeringT: 'Not the goal you are working toward',
   notSteeringS:
     'Your daily limit is being worked out from {goal}. The figures below show what would happen if this goal steered instead.',
@@ -813,8 +823,7 @@ export const en: Record<StringKey, string> = {
   rdLastMonthEmpty: 'Last month has too few entries — the comparison would mislead.',
   obMissingT: 'Your commitments are not recorded',
   obMissingB: 'The app sees no obligations against you, so it treats the whole salary as free and the goal takes a bigger share than it should. Add your rent, internet and monthly transfer.',
-  obMissingBtn: 'Add my commitments',
-  obMissingDone: 'Added — edit them under Plan → Commitments',
+  obMissingBtn: 'Add them now',
 
   // ---- projection-based goal assessment ------------------------------------
   pjT: 'Is the goal possible?',

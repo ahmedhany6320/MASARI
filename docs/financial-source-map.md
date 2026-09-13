@@ -143,12 +143,26 @@ here. What is unproven is the **import** side: `importBackup.ts` re-maps field
 by field and there is no round-trip test over a ledger that exercises every
 optional field. Phase 1 adds one.
 
-### D4 — Onboarding writes obligations the user never entered. *(confirmed, severity: high — trust)*
+### D4 — Onboarding wrote obligations the user never entered. *(confirmed, severity: high — trust; fixed in Phase 5)*
 
-`app/onboarding.tsx:80,87` — every new ledger is seeded with Rent 1800,
-Internet 300 and a planned transfer of 850, after the preview and regardless of
-what was entered. These are the author's own figures. This breaks §11: the
-first thing a new user sees is someone else's rent presented as their own.
+Every new ledger was seeded with Rent 1,800, Internet 300 and a planned
+transfer of 850, after the preview and regardless of what was entered. Those
+are the author's own figures, so a stranger's first view of the app was
+someone else's rent presented as their own.
+
+It was worse than a wrong default. The preview above the button subtracted
+only what the user had typed, so the very first number the app produced was
+one it contradicted a second later — and the Home banner offering to "add my
+commitments" inserted the same three figures silently.
+
+Onboarding now asks for rent, internet, a monthly transfer and anything else
+as named fields; a blank field writes nothing, and the preview subtracts
+exactly what will be saved. The banner navigates to Plan instead of inserting
+anything. `DEFAULT_COMMITMENTS`, `DEFAULT_PLANNED_TRANSFER` and
+`seedObligations` are deleted, so those figures no longer exist anywhere in
+the app. `onboarding.test.ts` asserts the absence — including by serialising a
+fresh ledger and failing on any non-zero amount at all — because absence is
+what silently comes back.
 
 ### D5 — More than one function answers the same question. *(confirmed, severity: HIGH — worse than first assessed; addressed in Phase 2)*
 

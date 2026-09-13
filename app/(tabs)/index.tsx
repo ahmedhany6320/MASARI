@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardClaimBreakdown } from '../../src/components/CardClaim';
 import { SpendPlanCard } from '../../src/components/SpendPlanCard';
@@ -41,7 +41,6 @@ export default function HomeScreen() {
   const [adding, setAdding] = useState(false);
 
   const ledger = useLedger((s) => s.ledger);
-  const seedObligations = useLedger((s) => s.seedObligations);
   // The goal steering the plan, taken from the evaluation rather than chosen
   // again here — so this screen and the projection can never disagree on which
   // goal the numbers are about.
@@ -77,13 +76,16 @@ export default function HomeScreen() {
             <Title style={{ color: p.warn }}>{t('obMissingT')}</Title>
             <Caption>{t('obMissingB')}</Caption>
             <View style={{ marginTop: SPACE.md }}>
-              <Button
-                label={t('obMissingBtn')}
-                onPress={() => {
-                  seedObligations();
-                  Alert.alert(t('obMissingT'), t('obMissingDone'));
-                }}
-              />
+              {/*
+                * Takes the user somewhere to type their own.
+                *
+                * This button used to insert Rent 1,800, Internet 300 and a
+                * transfer of 850 — the author's figures, written into a
+                * stranger's ledger and then presented back to them as their
+                * obligations. A prompt to record something is not licence to
+                * invent what it says.
+                */}
+              <Button label={t('obMissingBtn')} onPress={() => router.push('/(tabs)/plan')} />
             </View>
           </Card>
         )}

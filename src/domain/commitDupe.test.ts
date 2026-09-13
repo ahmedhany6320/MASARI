@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { commitmentsDue } from './commitments';
-import { emptyLedger, DEFAULT_COMMITMENTS } from './defaults';
+import { emptyLedger } from './defaults';
 import { simulate, type ProjectionInput } from './projection';
 import type { Commitment, Ledger } from './types';
 
@@ -66,12 +66,13 @@ describe('a commitment is never counted twice', () => {
   });
 
   it('holds the same total however many times the list is re-read', () => {
-    const l = led(DEFAULT_COMMITMENTS.map((d, i) =>
-      commit(`k${i}`, d.ar, d.en, d.amt, d.day),
-    ));
+    const l = led([
+      commit('r', 'إيجار', 'Rent', 1800, 1),
+      commit('n', 'نت', 'Internet', 300, 18),
+    ]);
     const a = commitmentsDue(l.commits, NOW).total;
     const b = commitmentsDue(l.commits, NOW).total;
     expect(a).toBe(b);
-    expect(a).toBe(DEFAULT_COMMITMENTS.reduce((x, d) => x + d.amt, 0));
+    expect(a).toBe(2100);
   });
 });
