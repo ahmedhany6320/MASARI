@@ -1,0 +1,192 @@
+import { describe, expect, it } from 'vitest';
+import real from './__fixtures__/backup-2026-08-14.json';
+import { backupFilename, backupToText, buildBackup, summarizeBackup } from './exportBackup';
+import { importBackup } from './importBackup';
+
+const NOW = new Date(2026, 7, 22, 12, 0, 0);
+const SETTINGS = { lang: 'ar' as const, theme: 'light' as const, fxRate: 13.6 };
+
+describe('export → import round trip', () => {
+  const { ledger, settings } = importBackup(real);
+  const text = backupToText(ledger, settings, NOW);
+  const back = importBackup(JSON.parse(text));
+
+  it('restores every transaction', () => {
+    expect(back.counts.transactions).toBe(ledger.tx.length);
+    expect(back.ledger.tx.map((x) => x.id)).toEqual(ledger.tx.map((x) => x.id));
+  });
+
+  it('restores balances exactly', () => {
+    expect(back.ledger.bankOpen).toBe(ledger.bankOpen);
+    expect(back.ledger.cashOpen).toBe(ledger.cashOpen);
+    expect(back.ledger.base).toBe(ledger.base);
+    expect(back.ledger.cardAdj).toBe(ledger.cardAdj);
+  });
+
+  it('restores the card setup', () => {
+    expect(back.ledger.cardSetup).toEqual(ledger.cardSetup);
+    expect(back.ledger.cardCfg).toEqual(ledger.cardCfg);
+  });
+
+  it('restores people, goals, receivables and rules', () => {
+    expect(back.ledger.people).toEqual(ledger.people);
+    expect(back.ledger.goals).toEqual(ledger.goals);
+    expect(back.ledger.recv).toEqual(ledger.recv);
+    expect(back.ledger.rules).toEqual(ledger.rules);
+  });
+
+  it('restores settings', () => {
+    expect(back.settings.lang).toBe(settings.lang);
+    expect(back.settings.fxRate).toBe(settings.fxRate);
+  });
+
+  it('is stable — exporting a restored ledger gives the same text', () => {
+    const again = backupToText(back.ledger, back.settings, NOW);
+    expect(again).toBe(text);
+  });
+});
+
+describe('buildBackup', () => {
+  const { ledger } = importBackup(real);
+
+  it('carries the fields this app added', () => {
+    const withExtras = {
+      ...ledger,
+      minDailySpend: 60,
+      goalMode: { egypt: 'horizon' as const },
+      baseline: { ts: 123, cycleSpentBefore: 300 },
+    };
+    const env = buildBackup(withExtras, SETTINGS, NOW);
+    expect(env.data.minDailySpend).toBe(60);
+    expect(env.data.goalMode).toEqual({ egypt: 'horizon' });
+    expect(env.data.baseline).toEqual({ ts: 123, cycleSpentBefore: 300 });
+  });
+
+  it('round-trips the new fields too', () => {
+    const withExtras = {
+      ...ledger,
+      minDailySpend: 75,
+      goalMode: { egypt: 'horizon' as const },
+      baseline: { ts: 999, cycleSpentBefore: 250 },
+    };
+    const back = importBackup(buildBackup(withExtras, SETTINGS, NOW));
+    expect(back.ledger.minDailySpend).toBe(75);
+    expect(back.ledger.goalMode).toEqual({ egypt: 'horizon' });
+    expect(back.ledger.baseline).toEqual({ ts: 999, cycleSpentBefore: 250 });
+  });
+
+  it('leaves the new fields empty for a backup from the original app', () => {
+    // The real fixture predates all three, and must still import cleanly.
+    // They land on their empty values rather than `undefined` so that a
+    // factory reset survives the JSON round-trip the persistence layer does —
+    // `JSON.stringify` drops undefined keys, and a dropped key gets refilled
+    // from the previous save on the next launch.
+    const back = importBackup(real);
+    expect(back.ledger.minDailySpend).toBeNull();
+    expect(back.ledger.baseline).toBeNull();
+    expect(back.ledger.goalMode).toEqual({});
+  });
+
+  it('round-trips the scheduling fields', () => {
+    const withSched = {
+      ...ledger,
+      sslBasis: 'balance' as const,
+      cardSetup: { stmt0: 100, unbilled0: 50, instBal: 2400, instMo: 400, setupAt: 1750000000000 },
+      commits: [
+        { id: 'k1', ar: 'إيجار', en: 'Rent', amt: 3000, day: 5, paused: false, paidMonth: true, paidFor: '2026-08' },
+      ],
+    };
+    const back = importBackup(buildBackup(withSched, SETTINGS, NOW));
+    expect(back.ledger.sslBasis).toBe('balance');
+    expect(back.ledger.cardSetup?.setupAt).toBe(1750000000000);
+    expect(back.ledger.commits[0]?.paidFor).toBe('2026-08');
+  });
+
+  it('leaves the basis automatic for a backup that predates the choice', () => {
+    // Absent means automatic, which is what lets a goal with a duration steer
+    // spending. Defaulting it to 'salary' would silently switch that off.
+    expect(importBackup(real).ledger.sslBasis).toBeUndefined();
+  });
+
+  it('rejects a basis it does not recognise rather than storing it', () => {
+    expect(importBackup({ data: { sslBasis: 'vibes' } }).ledger.sslBasis).toBeUndefined();
+  });
+
+  it('carries an explicit choice through unchanged', () => {
+    for (const b of ['salary', 'balance', 'goal'] as const) {
+      expect(importBackup({ data: { sslBasis: b } }).ledger.sslBasis).toBe(b);
+    }
+  });
+
+  it('ignores a goal mode it does not recognise', () => {
+    const back = importBackup({ data: { goalMode: { g1: 'nonsense', g2: 'horizon' } } });
+    expect(back.ledger.goalMode).toEqual({ g2: 'horizon' });
+  });
+
+  it('stamps the time it was taken', () => {
+    expect(buildBackup(ledger, SETTINGS, NOW).savedAt).toBe(NOW.getTime());
+  });
+});
+
+describe('backupFilename', () => {
+  it('is dated and zero padded', () => {
+    expect(backupFilename(new Date(2026, 0, 5))).toBe('masari-backup-2026-01-05.json');
+  });
+});
+
+describe('summarizeBackup', () => {
+  const { ledger, settings } = importBackup(real);
+
+  it('counts what the file holds', () => {
+    const text = backupToText(ledger, settings, NOW);
+    const s = summarizeBackup(text, ledger);
+    expect(s.transactions).toBe(44);
+    expect(s.people).toBe(3);
+    expect(s.sizeKb).toBeGreaterThan(0);
+  });
+
+  it('measures bytes, not characters — Arabic memos are multi-byte', () => {
+    const text = backupToText(ledger, settings, NOW);
+    const s = summarizeBackup(text, ledger);
+    expect(s.sizeKb).toBeGreaterThan(text.length / 1024 / 2);
+  });
+});
+
+describe('the goal basis survives a backup', () => {
+  const { ledger } = importBackup(real);
+
+  it('round-trips', () => {
+    const back = importBackup(buildBackup({ ...ledger, sslBasis: 'goal' }, SETTINGS, NOW));
+    expect(back.ledger.sslBasis).toBe('goal');
+  });
+});
+
+describe('the cash reserve survives a backup', () => {
+  const { ledger } = importBackup(real);
+
+  it('round-trips', () => {
+    const back = importBackup(buildBackup({ ...ledger, bufferTarget: 7500 }, SETTINGS, NOW));
+    expect(back.ledger.bufferTarget).toBe(7500);
+  });
+
+  it('treats a missing or nonsense value as no reserve', () => {
+    expect(importBackup(real).ledger.bufferTarget).toBeNull();
+    expect(importBackup({ data: { bufferTarget: -5 } }).ledger.bufferTarget).toBeNull();
+  });
+});
+
+describe('the living band survives a backup', () => {
+  const { ledger } = importBackup(real);
+
+  it('round-trips both ends', () => {
+    const back = importBackup(
+      buildBackup({ ...ledger, minDailySpend: 20, comfortDailySpend: 40 }, SETTINGS, NOW),
+    );
+    expect(back.ledger.minDailySpend).toBe(20);
+    expect(back.ledger.comfortDailySpend).toBe(40);
+  });
+
+  it('leaves the upper end unset when a backup predates it', () => {
+    expect(importBackup(real).ledger.comfortDailySpend).toBeNull();
+  });
+});
