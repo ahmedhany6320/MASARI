@@ -70,17 +70,6 @@ export interface GoalPlan {
   targetMonths: number | null;
 }
 
-/** Where the goal actually stands after `months` at the current pace. */
-export interface GoalProjectionAt {
-  months: number;
-  /** Total held at that point, in the goal's currency. */
-  amount: number;
-  progress: number;
-  /** Still missing at that point. */
-  shortfall: number;
-  reached: boolean;
-}
-
 /** What hitting the goal by a chosen deadline actually demands. */
 export interface GoalRequirement {
   months: number;
@@ -164,30 +153,14 @@ export function goalPlan(goal: Goal, capacity: Capacity, fx: number, now: Date):
   };
 }
 
-/**
- * Where the goal lands after a given number of months at the current pace.
- *
- * This is the answer to "so what DOES my money get me?" — far more useful than
- * a bare "you will not make it", because it turns a wall into a position.
+/*
+ * `projectGoal` used to live here: "where does the goal stand after N months
+ * at the current pace". It had no caller left — the goal screen answers that
+ * from the engine's single monthly contribution now — and a spare goal
+ * projector sitting in the domain is not harmless. It is the next divergence,
+ * waiting for someone to reach for it because it is right there and reads
+ * correctly.
  */
-export function projectGoal(
-  goal: Goal,
-  capacity: Capacity,
-  fx: number,
-  months: number,
-): GoalProjectionAt {
-  const target = goal.target ?? 0;
-  const have = held(goal, fx);
-  const saved = Math.max(0, toGoal(goal, capacity.saving, fx)) * months;
-  const amount = have + saved;
-  return {
-    months,
-    amount,
-    progress: target > 0 ? Math.min(1, amount / target) : 0,
-    shortfall: Math.max(0, target - amount),
-    reached: target > 0 && amount >= target,
-  };
-}
 
 /**
  * What reaching the goal in `months` demands, and whether that is possible.

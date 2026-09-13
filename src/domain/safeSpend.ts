@@ -2,10 +2,8 @@ import { bankBalance, cashBalance } from './balances';
 import { discretionaryTotal } from './classify';
 import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPosition } from './card';
 import {
-  adaptDaily,
   adaptTarget,
   livingBand,
-  type DailyAdaptation,
   type LivingBand,
   type TargetAdaptation,
 } from './adaptiveDaily';
@@ -138,12 +136,6 @@ export interface SafeSpend {
   ssl: number;
   /** The declared living band: survival floor and balanced level. */
   band: LivingBand;
-  /**
-   * The daily control loop's reading. Present whenever a band is declared —
-   * this is what makes the figure answer back to real spending instead of
-   * restating the plan.
-   */
-  daily: DailyAdaptation | null;
   /** What the steering goal is actually worth at the current pace. */
   targetAdapted: TargetAdaptation | null;
   /**
@@ -573,17 +565,6 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
       })
     : null;
 
-  const daily = hasBand
-    ? adaptDaily({
-        livingBudget: Math.max(0, livingPool),
-        spent: cycleSpend,
-        daysElapsed: dom,
-        daysLeft,
-        daysInMonth,
-        band,
-      })
-    : null;
-
   /*
    * The single figure every projection is built from. Assembled here, once,
    * so no caller can reconstruct a slightly different version of it.
@@ -600,17 +581,27 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    */
   const bankedToGoal = projected
     ? Math.max(0, projected.variance) * UNDERSPEND_BANK_SHARE
-    : (daily?.bankedToGoal ?? 0);
-  const goalAbsorbed = projected ? projected.absorbed : (daily?.goalAbsorbed ?? 0);
+    : 0;
+  const goalAbsorbed = projected ? projected.absorbed : 0;
   const goalMonthly = Math.max(
     0,
     goalReq + bankedToGoal + variance.toGoal - goalAbsorbed,
   );
 
+  /*
+   * The projection owns the daily figure whenever a range is declared. The
+   * plan takes over for a goal with no range to project against, and the bare
+   * residual is the last resort — a ledger with neither.
+   *
+   * There used to be a fourth branch here, `adaptDaily`, sitting between the
+   * first two. It could never be reached: it was gated on exactly the same
+   * condition as the projection, so the projection always answered first. It
+   * ran on every evaluation and its result was thrown away — except that it
+   * had also been feeding the goal's banked underspend, measured against a
+   * daily figure the app had already stopped showing.
+   */
   const allowance = projected
     ? projected.today
-    : daily
-    ? daily.today
     : planSteers
       ? plan.dailyAllowance
       : spendable > 0
@@ -667,7 +658,6 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     },
     basis,
     band,
-    daily,
     goalMonthly,
     bankedToGoal,
     goalAbsorbed,

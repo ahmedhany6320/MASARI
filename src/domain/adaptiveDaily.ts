@@ -42,126 +42,22 @@ export function livingBand(min: number | null | undefined, comfort: number | nul
   return b >= a ? { min: a, comfort: b } : { min: b, comfort: a };
 }
 
-export type SpendZone =
-  /** At or above a balanced day. */
-  | 'comfort'
-  /** Between the floor and a balanced day: liveable, but being endured. */
-  | 'tight'
-  /** Exactly at the floor — the goal is already absorbing the difference. */
-  | 'floor'
-  /** No band declared, so nothing to judge against. */
-  | 'unset';
-
-export interface DailyAdaptation {
-  /** What is safe to spend today. The number the user acts on. */
-  today: number;
-  zone: SpendZone;
-  /** Where `today` sits in the band, 0 at the floor and 1 at comfort. */
-  bandPosition: number;
-
-  /** Planned spending to date minus actual. Positive means ahead. */
-  variance: number;
-  /** Half of any underspend, moved to the goal and no longer spendable. */
-  bankedToGoal: number;
-  /** The month's living allocation after banking. */
-  livingBudget: number;
-  /** Of that, what is left. */
-  remaining: number;
-  daysLeft: number;
-  daysElapsed: number;
-
-  /**
-   * Deficit the goal had to absorb because the floor held. Non-zero only when
-   * the month has overrun far enough that honouring the floor costs the goal.
-   */
-  goalAbsorbed: number;
-
-  /** The even pace the month was planned at, for comparison. */
-  plannedDaily: number;
-  /** What a balanced day would cost across the days that remain. */
-  comfortDaily: number;
-  /** True when spending is at or under plan. */
-  onTrack: boolean;
-}
-
-export interface DailyInputs {
-  /** The month's living allocation, before adaptation. */
-  livingBudget: number;
-  /** Spent so far this cycle. */
-  spent: number;
-  /** Days already elapsed in the cycle, at least 1. */
-  daysElapsed: number;
-  /** Days remaining including today, at least 1. */
-  daysLeft: number;
-  daysInMonth: number;
-  band: LivingBand;
-  /** Share of an underspend banked to the goal, 0–1. */
-  bankShare?: number;
-}
-
-export function adaptDaily(inp: DailyInputs): DailyAdaptation {
-  const daysElapsed = Math.max(1, inp.daysElapsed);
-  const daysLeft = Math.max(1, inp.daysLeft);
-  const budget = Math.max(0, inp.livingBudget);
-  const spent = Math.max(0, inp.spent);
-  const bankShare = Math.min(1, Math.max(0, inp.bankShare ?? 0.5));
-
-  const plannedDaily = budget / Math.max(1, inp.daysInMonth);
-
-  /*
-   * Measured against days that have FINISHED, not including today.
-   *
-   * At the start of day N you are expected to have spent N−1 days' worth.
-   * Counting today as elapsed treats every morning's untouched allowance as a
-   * saving, banks half of it to the goal before a single purchase, and
-   * reports a comfortable month as a tight one from the moment it opens.
-   */
-  const completedDays = Math.max(0, daysElapsed - 1);
-  const plannedToDate = plannedDaily * completedDays;
-  const variance = plannedToDate - spent;
-
-  /*
-   * Only an UNDERSPEND is banked. An overspend deliberately banks nothing:
-   * taking it from the goal as well as from the remaining days would charge it
-   * twice, and the whole point of rule 2 is that the month absorbs it.
-   */
-  const bankedToGoal = variance > 0 ? variance * bankShare : 0;
-  const livingBudget = Math.max(0, budget - bankedToGoal);
-
-  const remaining = livingBudget - spent;
-  const even = remaining / daysLeft;
-
-  // The floor is a hard stop. Where the even pace falls below it, the goal
-  // pays the difference rather than the person.
-  const today = Math.max(inp.band.min, even);
-  const goalAbsorbed = Math.max(0, (inp.band.min - even) * daysLeft);
-
-  const span = inp.band.comfort - inp.band.min;
-  const zone: SpendZone =
-    inp.band.comfort <= 0 && inp.band.min <= 0
-      ? 'unset'
-      : today >= inp.band.comfort
-        ? 'comfort'
-        : today > inp.band.min
-          ? 'tight'
-          : 'floor';
-
-  return {
-    today,
-    zone,
-    bandPosition: span > 0 ? Math.min(1, Math.max(0, (today - inp.band.min) / span)) : today > 0 ? 1 : 0,
-    variance,
-    bankedToGoal,
-    livingBudget,
-    remaining,
-    daysLeft,
-    daysElapsed,
-    goalAbsorbed,
-    plannedDaily,
-    comfortDaily: inp.band.comfort,
-    onTrack: variance >= 0,
-  };
-}
+/*
+ * `adaptDaily` used to live here — a second daily control loop, with its own
+ * zones, its own variance and its own share of underspend banked to the goal.
+ *
+ * It could not be reached. It was gated on exactly the same condition as the
+ * projection, so the projection always answered first: it ran on every
+ * evaluation and its result was discarded. Except that it had also been
+ * feeding the goal's banked underspend, measured against a daily figure the
+ * app had already stopped showing — so on one real ledger the goal was being
+ * credited with savings against a plan of 254 a day while the user was shown
+ * 50.
+ *
+ * `projection.dailyBudget` is the loop now. What survives here is
+ * `livingBand`, which reads the declared range, and `adaptTarget`, which says
+ * where a goal lands at a given monthly contribution.
+ */
 
 export type TargetDrift = 'restored' | 'raised' | 'lowered' | 'steady' | 'unreachable';
 

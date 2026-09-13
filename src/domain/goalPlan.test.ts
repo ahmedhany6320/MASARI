@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import real from './__fixtures__/backup-2026-08-14.json';
 import { burnRate } from './insights';
-import { goalPlan, goalScenarios, projectGoal, requirementFor, type Capacity } from './goalPlan';
+import { goalPlan, goalScenarios, requirementFor, type Capacity } from './goalPlan';
 import { importBackup } from './importBackup';
 import { safeSpend } from './safeSpend';
 import type { Goal } from './types';
@@ -70,32 +70,6 @@ describe('goalPlan — why it says never', () => {
     const plan = goalPlan({ ...egypt, extEgp: 1_200_000 }, cap, FX, NOW);
     expect(plan.blocker).toBe('met');
     expect(plan.monthsAtPace).toBe(0);
-  });
-});
-
-describe('projectGoal — where the money actually gets me', () => {
-  it('answers how far 8 months gets you', () => {
-    const at8 = projectGoal(egypt, cap, FX, 8);
-    expect(at8.amount).toBeCloseTo(8244 * FX * 8, 2);
-    expect(at8.reached).toBe(false);
-    expect(at8.shortfall).toBeGreaterThan(0);
-    // Roughly 82% of the way there.
-    expect(at8.progress).toBeGreaterThan(0.8);
-    expect(at8.progress).toBeLessThan(0.85);
-  });
-
-  it('reports arrival once the horizon is long enough', () => {
-    expect(projectGoal(egypt, cap, FX, 12).reached).toBe(true);
-  });
-
-  it('counts money already held', () => {
-    const withHeld = projectGoal({ ...egypt, extEgp: 200_000 }, cap, FX, 0);
-    expect(withHeld.amount).toBe(200_000);
-  });
-
-  it('never projects backwards when nothing is being saved', () => {
-    const broke: Capacity = { ...cap, saving: -500 };
-    expect(projectGoal(egypt, broke, FX, 6).amount).toBe(0);
   });
 });
 

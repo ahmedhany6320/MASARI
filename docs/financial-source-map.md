@@ -356,6 +356,29 @@ and the same post-reserve pool the goal reservation uses. Two consistency
 rules hold it: capacity must equal pool minus living, and must split exactly
 into the goal reservation plus the surplus.
 
+### D15 — Seven spare goal projectors, none of them called. *(the last strangler step)*
+
+`adaptive.ts` exported `reserveForGoal`, `adaptiveHorizon`, `dailyForTarget`,
+`planDrift` and `horizonTracker`. `goalPlan.ts` exported `projectGoal`.
+`adaptiveDaily.ts` held `adaptDaily`, an entire second daily control loop with
+its own zones, its own variance and its own share of underspend banked to the
+goal.
+
+Not one had a production caller. They were reached only by their own tests —
+except `adaptDaily`, which was worse than dead: `safeSpend` computed it on
+every evaluation and threw the result away, because it was gated on exactly
+the same condition as the projection and so could never be the answer. It had
+nonetheless been feeding the goal's banked underspend, measured against a
+daily figure of 254 while the user was being shown 50.
+
+All deleted. `adaptive.ts` 384 → 134 lines, `adaptiveDaily.ts` 235 → 131,
+`goalPlan.ts` 308 → 281. What survives is what screens actually read:
+`adaptiveOutlook`, `GoalMode`, `livingBand`, `adaptTarget`, `goalPlan`,
+`requirementFor`, `goalScenarios` — all now fed canonical inputs.
+
+The 26 tests that went with them were testing code nothing called, which is
+why the suite is smaller and says more. §11 of the contract records the rule.
+
 ## 5. Order of work
 
 Data protection first, then import/sync, then the engine, then the screens —

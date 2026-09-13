@@ -186,9 +186,10 @@ describe('the goal basis — fix the duration, the spend is the lever', () => {
       NOW,
     );
     expect(wrecked.allowance).toBe(20);
-    expect(wrecked.daily?.zone).toBe('floor');
-    // And the shortfall is charged somewhere explicit rather than vanishing.
-    expect(wrecked.daily?.goalAbsorbed).toBeGreaterThan(0);
+    // Held at the floor, with the shortfall charged somewhere explicit rather
+    // than vanishing.
+    expect(wrecked.dailyDerivation?.today).toBe(20);
+    expect(wrecked.goalAbsorbed).toBeGreaterThan(0);
   });
 
   it('falls back to the salary basis when no goal has a duration', () => {
@@ -320,7 +321,7 @@ describe('there is exactly one answer to "where does the goal land"', () => {
     // used to each rebuild their own version of this, and on this exact
     // ledger they produced 433,894, 409,958, 407,261, null and NaN.
     expect(c.goalMonthly).toBeCloseTo(
-      c.goalReq + (c.daily?.bankedToGoal ?? 0) + c.variance.toGoal,
+      Math.max(0, c.goalReq + c.bankedToGoal + c.variance.toGoal - c.goalAbsorbed),
       6,
     );
   });

@@ -149,7 +149,29 @@ These three are one contract, and it is currently broken (see the source map).
   field must merge it from local state rather than blanking it. Last-write-wins
   is an accepted trade for conflicts; silent field loss is not.
 
-## 11. Defaults are the user's, not the author's
+## 11. One projector, and no spares
+
+Exactly one place answers "where does this goal land, and what does that cost
+per day": the simulation in `projection.ts`, reached through
+`evaluateFinancialState`. Anything else that wants the answer reads it.
+
+This is a rule about **dead code as much as live code**. Five exported
+functions — `reserveForGoal`, `adaptiveHorizon`, `dailyForTarget`, `planDrift`,
+`horizonTracker` — plus `projectGoal` and a whole second daily control loop in
+`adaptDaily` each independently answered some version of that question, and
+none of them had a caller left. They were reached only by their own tests.
+
+That is not harmless. A spare projector sitting in the domain is the next
+divergence, waiting for someone to reach for it because it is right there and
+reads correctly — which is precisely how this app came to print 433,894,
+409,958, 407,261, null and NaN for one question, two of them on the same
+screen. All of them are deleted.
+
+If a new question genuinely needs a different model, it goes in
+`projection.ts` beside the existing one, where the consistency harness in
+`engine.ts` can hold the two against each other.
+
+## 12. Defaults are the user's, not the author's
 
 No figure the user did not enter or explicitly accept may be written into their
 ledger. A seeded obligation must be shown, named and confirmed before it is
