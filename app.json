@@ -3,7 +3,7 @@
     "name": "مصاري",
     "slug": "masari",
     "scheme": "masari",
-    "version": "0.25.0",
+    "version": "0.26.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -55,7 +55,7 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
-      "versionCode": 15
+      "versionCode": 16
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -66,9 +66,7 @@
       "router": {},
       "eas": {}
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "0.26.0",
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
