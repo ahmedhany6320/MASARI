@@ -31,3 +31,5 @@ export * from './forecast';
 export * from './readiness';
 export * from './projection';
 export * from './defaults';
+export * from './migrate';
+export * from './syncMerge';

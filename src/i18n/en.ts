@@ -326,6 +326,8 @@ export const en: Record<StringKey, string> = {
   syncSkipped: 'Older rows skipped:',
   pullConfirmT: 'Pull from cloud',
   pullConfirmS: 'This replaces the data on this device with what is stored in the cloud. Are you sure?',
+  pullPartial:
+    'The cloud copy was uploaded by an older build, so it holds no overtime, receivables, planned transfers or rules. Those were kept from this device rather than blanked. Upload again to make the cloud copy complete.',
   loading: 'One moment...',
   notifNeedsBuild: 'Notifications do not run inside Expo Go on Android — that is an Expo restriction, not the app. They work in a development build with no code change.',
   deleteConfirm: 'Delete this? It cannot be undone.',

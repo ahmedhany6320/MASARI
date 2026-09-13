@@ -104,6 +104,9 @@ export function importBackup(raw: unknown): ImportResult {
     };
   }
   led.cardAdj = num(d.cardAdj, 0) ?? 0;
+  // The documented reason for the last manual card correction. Dropping it
+  // left an unexplained figure that nothing in the app could account for.
+  led.cardAdjNote = typeof d.cardAdjNote === 'string' ? d.cardAdjNote : null;
 
   // ---- categories ---------------------------------------------------------
   const cats: Category[] = [];
@@ -141,6 +144,9 @@ export function importBackup(raw: unknown): ImportResult {
         paused: bool(k.paused),
         paidMonth: bool(k.paidMonth),
         paidFor: typeof k.paidFor === 'string' ? k.paidFor : null,
+        // What was really paid, when it differed from the plan. Losing it on
+        // restore threw away the variance that belongs to the goal.
+        actual: num(k.actual),
       });
     }
     led.commits = out;
@@ -199,11 +205,21 @@ export function importBackup(raw: unknown): ImportResult {
         emg: { ar: 'احتياطي الطوارئ', en: 'Emergency fund' },
       };
       const label = known[id] ?? { ar: id, en: id };
+      // A stored name always wins. Only a backup that carries none — which is
+      // every file the prototype wrote — falls back to the table above, and
+      // only then does the id decide the currency.
+      const ar = str(g.ar);
+      const en = str(g.en);
       out.push({
         id,
-        ar: label.ar,
-        en: label.en,
-        currency: id === 'egypt' ? 'EGP' : 'AED',
+        ar: ar || en || label.ar,
+        en: en || ar || label.en,
+        currency:
+          g.currency === 'EGP' || g.currency === 'AED'
+            ? g.currency
+            : id === 'egypt'
+              ? 'EGP'
+              : 'AED',
         target: num(g.target),
         alloc: num(g.alloc, 0) ?? 0,
         months: num(g.months),
@@ -219,7 +235,14 @@ export function importBackup(raw: unknown): ImportResult {
     led.planTf = d.planTf
       .map((raw) => {
         const p = raw as Record<string, unknown>;
-        return { id: str(p.id), amt: num(p.amt, 0) ?? 0, day: num(p.day) };
+        return {
+          id: str(p.id),
+          amt: num(p.amt, 0) ?? 0,
+          day: num(p.day),
+          // Without the cycle it was satisfied in, a transfer already sent
+          // comes back as still owed and is budgeted for a second time.
+          sentFor: typeof p.sentFor === 'string' ? p.sentFor : null,
+        };
       })
       .filter((p) => p.id !== '');
   }
@@ -268,6 +291,11 @@ export function importBackup(raw: unknown): ImportResult {
         fee: num(x.fee) ?? undefined,
         rate: num(x.rate) ?? undefined,
         to: typeof x.to === 'string' ? x.to : undefined,
+        back: num(x.back) ?? undefined,
+        // Load-bearing: an expense that settles a commitment must stay
+        // marked as one, or restoring a backup charges the same rent twice
+        // — once as the obligation, once as discretionary spending.
+        commitId: typeof x.commitId === 'string' ? x.commitId : undefined,
       });
     }
     // Newest first, matching what every screen expects.

@@ -76,7 +76,7 @@ export function CloudSync() {
   async function doPull() {
     setBusy(true);
     try {
-      const { result, error } = await pullLedger();
+      const { result, error } = await pullLedger(ledger);
       if (error) {
         Alert.alert(t('cloudT'), error);
         return;
@@ -95,6 +95,11 @@ export function CloudSync() {
           onPress: () => {
             replaceAll(result.ledger, result.settings);
             setLastSync(new Date().toLocaleString(settings.lang === 'ar' ? 'ar-EG' : 'en-GB'));
+            // The cloud copy predates the ledger document, so parts of what
+            // just landed came from this phone rather than from the account.
+            // Say so — a sync that quietly half-worked is worse than one that
+            // explains itself.
+            if (!result.complete) Alert.alert(t('cloudT'), t('pullPartial'));
           },
         },
       ]);

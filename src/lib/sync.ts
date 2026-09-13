@@ -1,5 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Category, Commitment, Goal, Ledger, Person, Tx } from '../domain';
+import {
+  buildBackup,
+  importBackup,
+  LEDGER_SCHEMA_VERSION,
+  mergeRelationalPull,
+} from '../domain';
 import { isUuid } from './id';
 import { supabase } from './supabase';
 
@@ -85,6 +91,27 @@ export async function pushLedger(
       card_setup_at: setup.setupAt != null ? new Date(setup.setupAt).toISOString() : null,
       sav_target: ledger.savTarget,
       ssl_basis: ledger.sslBasis ?? 'salary',
+      /*
+       * The whole ledger, in the backup file format.
+       *
+       * The columns above and the tables below cover what is worth querying,
+       * not everything the ledger holds — overtime, receivables, planned
+       * transfers, categorisation rules, the card correction note, each
+       * commitment's actual paid amount and every transaction's `commitId`
+       * have no home in them. Pushing only the relational shape meant the
+       * remote never held those fields, so pulling could only ever hand back
+       * a ledger with holes in it.
+       *
+       * Reusing the backup format rather than inventing a second one means
+       * there is a single serialisation to keep correct, and the backup
+       * round-trip test covers sync too.
+       */
+      doc: buildBackup(ledger, {
+        lang: settings.lang as 'ar' | 'en',
+        theme: settings.theme as 'light' | 'dark',
+        fxRate: settings.fxRate,
+      }).data,
+      doc_version: LEDGER_SCHEMA_VERSION,
     });
     if (lErr) throw lErr;
 
@@ -194,6 +221,13 @@ async function replaceCollection<T extends { id: string }>(
 export interface PulledLedger {
   ledger: Ledger;
   settings: { lang: 'ar' | 'en'; theme: 'light' | 'dark'; fxRate: number; onboarded: boolean };
+  /**
+   * `false` when the remote predates the ledger document and the fields its
+   * tables cannot carry were filled from this device instead of from the
+   * cloud. Worth saying out loud: those fields did not come from the account
+   * being pulled.
+   */
+  complete: boolean;
 }
 
 /**
@@ -203,8 +237,17 @@ export interface PulledLedger {
  * "nothing stored yet" apart from "stored, and it is empty" — overwriting a
  * populated phone with a genuinely empty remote is the one destructive case
  * here, and the UI confirms before doing it.
+ *
+ * Two shapes can come back. A remote written by this build carries `doc`, the
+ * complete ledger in the backup format, and is used as-is. An older remote has
+ * only the relational tables, which have never held every field; what they
+ * cannot carry is filled from `local` rather than blanked, because a pull
+ * replaces the device's state and a missing column must not read as a
+ * deletion. `complete` says which happened, so the UI can be honest about it.
  */
-export async function pullLedger(): Promise<{ result: PulledLedger | null; error?: string }> {
+export async function pullLedger(
+  local: Ledger,
+): Promise<{ result: PulledLedger | null; error?: string }> {
   const sb = client();
   if (!sb) return { result: null, error: 'not-configured' };
 
@@ -230,6 +273,28 @@ export async function pullLedger(): Promise<{ result: PulledLedger | null; error
 
     const l = led.data as Record<string, unknown>;
     const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));
+
+    const prof0 = (profile.data ?? {}) as Record<string, unknown>;
+
+    // A remote that carries the whole ledger needs none of the reconstruction
+    // below. `importBackup` is the same reader the restore-from-file path
+    // uses, so a document written by an older build loads on exactly the terms
+    // a backup from that build would.
+    if (l.doc && typeof l.doc === 'object') {
+      const res = importBackup({ data: l.doc });
+      return {
+        result: {
+          ledger: res.ledger,
+          complete: true,
+          settings: {
+            lang: res.settings.lang,
+            theme: res.settings.theme,
+            fxRate: res.settings.fxRate,
+            onboarded: Boolean(prof0.onboarded),
+          },
+        },
+      };
+    }
 
     const budgets: Record<string, number> = {};
     const categories: Category[] = (cats.data ?? []).map((c: Record<string, unknown>) => {
@@ -317,7 +382,9 @@ export async function pullLedger(): Promise<{ result: PulledLedger | null; error
     const prof = (profile.data ?? {}) as Record<string, unknown>;
     return {
       result: {
-        ledger,
+        // Never blank what the remote has no column for.
+        ledger: mergeRelationalPull(ledger, local),
+        complete: false,
         settings: {
           lang: prof.lang === 'en' ? 'en' : 'ar',
           theme: prof.theme === 'dark' ? 'dark' : 'light',

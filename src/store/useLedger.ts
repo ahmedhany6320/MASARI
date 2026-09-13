@@ -8,6 +8,10 @@ import {
   DEFAULT_FX_RATE,
   DEFAULT_PLANNED_TRANSFER,
   emptyLedger,
+  LEDGER_SCHEMA_VERSION,
+  migrateState,
+  normalizeAmount,
+  normalizeMagnitude,
   type Account,
   type CardConfig,
   type CardSetup,
@@ -245,7 +249,26 @@ export const useLedger = create<LedgerStore>()(
         set((s) => ({
           // Newest first: every screen that shows transactions wants that order,
           // and sorting at render time would repeat the work on every frame.
-          ledger: { ...s.ledger, tx: [{ ...tx, id: newId() }, ...s.ledger.tx] },
+          ledger: {
+            ...s.ledger,
+            tx: [
+              {
+                ...tx,
+                // The single gate every recorded amount passes through:
+                // rounded to the minor unit so binary drift never
+                // accumulates, and a magnitude — because every type but one
+                // carries its direction itself, so a typed minus sign would
+                // make an expense raise the balance. `adjust` is the
+                // exception: a reconciliation genuinely goes either way, and
+                // its sign is the whole point.
+                amt: tx.type === 'adjust' ? normalizeAmount(tx.amt) : normalizeMagnitude(tx.amt),
+                ...(tx.back == null ? {} : { back: normalizeMagnitude(tx.back) }),
+                ...(tx.fee == null ? {} : { fee: normalizeMagnitude(tx.fee) }),
+                id: newId(),
+              },
+              ...s.ledger.tx,
+            ],
+          },
         })),
 
       removeTx: (id) =>
@@ -594,26 +617,33 @@ export const useLedger = create<LedgerStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({ ledger: s.ledger, settings: s.settings }),
       /**
+       * The schema version of the save this build writes.
+       *
+       * Saves written before versioning have none, which zustand reads as 0 —
+       * exactly the version the first migration expects, so existing phones
+       * upgrade without special handling.
+       */
+      version: LEDGER_SCHEMA_VERSION,
+      /**
+       * Schema changes live in an ordered chain in `domain/migrate.ts`, where
+       * they are pure and tested, rather than as fix-ups inside `merge`.
+       *
+       * The difference is not tidiness. A fix-up in `merge` runs on every
+       * launch, so the one correcting a stale `sslBasis` also undid that same
+       * choice when the user later made it deliberately. A migration runs
+       * once, against the version that needed it.
+       */
+      migrate: (persisted, from) => migrateState(persisted, from) as never,
+      /**
        * Zustand's default merge is shallow, so a ledger saved by an older
        * build would replace `settings` wholesale and drop any key added since
        * — leaving, say, `settings.reminders` undefined and crashing on first
        * read. Filling from the defaults per level keeps old saves loadable as
-       * the shape grows.
+       * the shape grows. Shape-filling only: no schema repair belongs here.
        */
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<LedgerStore>;
         const savedLedger = { ...(saved.ledger ?? {}) };
-
-        /*
-         * One-time migration. Builds 0.13 and 0.14 wrote `sslBasis: 'salary'`
-         * into every ledger automatically, before the basis had any meaning
-         * worth choosing. Left in place it pins the limit to the salary cycle
-         * and stops a goal with a duration from ever steering — which is the
-         * default now. Clearing it restores "automatic"; anyone who genuinely
-         * wants the salary cycle can pick it again, and that choice sticks
-         * because this only ever runs against the stale default.
-         */
-        if (savedLedger.sslBasis === 'salary') delete savedLedger.sslBasis;
 
         return {
           ...current,
