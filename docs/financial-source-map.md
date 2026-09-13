@@ -205,17 +205,45 @@ daily figure actually in force and now subtracts `goalAbsorbed` — honouring
 the living floor in an overspent month costs the goal real money, and only
 the credit was ever reported.
 
-### D6 — Web build artefact. *(not reproducible here)*
+### D6 — The web build served a blank page. *(CORRECTION: reproduces; fixed in Phase 6)*
 
-The review reports `dist/index.html` using `import.meta` without
-`type="module"`. There is no `dist/index.html` in this tree — `dist/` holds
-`_expo/`, `assets/` and `metadata.json` from a native export. Re-check after a
-web export before acting.
+Recorded in Phase 0 as "not reproducible". That was wrong, and the reason is
+worth keeping: the `dist/` in this tree held a **native** export, so there was
+no `index.html` to look at. Running an actual web export reproduces it exactly
+as reported.
+
+`expo export --platform web` emits `<script defer>` — a classic script, not a
+module. Zustand's middleware module ships a devtools helper reading
+`import.meta.env.MODE`; this app never uses devtools, but Metro does not
+tree-shake, so the expression is in the bundle. `import.meta` inside a classic
+script is a **syntax** error, thrown at parse time, so the entire bundle fails
+to execute and nothing in the console points at any line of this app's code.
+
+Fixed with a Babel plugin in `babel.config.js` that rewrites `import.meta` to
+an empty object, which makes every guarded read of `import.meta.env` take its
+production fallback. Verified: zero occurrences in the web bundle after the
+change, and the Android bundle is unchanged in size and still exports.
+
+One wrinkle worth recording — adding a `babel.config.js` at all changes preset
+resolution. `babel-preset-expo` is not a direct dependency (Expo resolves it
+internally when no config exists) and in this tree it is nested under
+`expo/node_modules`, so naming it by bare string fails outright. The config
+resolves it through `expo`'s own directory instead.
 
 ### D7 — Duplicate Android permissions. *(not reproducible here)*
 
 `app.json:47-52` declares four permissions, each once, plus a
-`blockedPermissions` list. No duplication at this commit.
+`blockedPermissions` list. No duplication at this commit. Re-checked in
+Phase 6 after the D6 correction, in case it was the same kind of mistake: it
+is not — there is genuinely nothing to fix.
+
+### `legacy-pwa/` — purpose confirmed, keeping it
+
+The original single-file PWA prototype, 903 KB of it. `README.md` names it as
+the reference implementation, `tsconfig.json` excludes it from the build, and
+it is the source of the backup format both the importer and the exporter are
+written against. It is documentation with a behavioural spec inside it, not a
+stale artefact. Left in place.
 
 ### D8 — Flags with no cycle attached. *(found in Phase 3, severity: high)*
 
