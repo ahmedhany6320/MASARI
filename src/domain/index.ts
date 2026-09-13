@@ -33,3 +33,4 @@ export * from './projection';
 export * from './defaults';
 export * from './migrate';
 export * from './syncMerge';
+export * from './engine';

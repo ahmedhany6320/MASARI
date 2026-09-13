@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import {
   burnRate,
   cardPosition,
+  evaluateFinancialState,
   formatAmount,
   formatMoney,
   safeSpend,
   savingSummary,
   type CardPosition,
+  type FinancialState,
   type SafeSpend,
   type SavingSummary,
 } from '../domain';
@@ -26,6 +28,24 @@ export function useSafeSpend(): SafeSpend {
   const ledger = useLedger((s) => s.ledger);
   const fxRate = useLedger((s) => s.settings.fxRate);
   return useMemo(() => safeSpend(ledger, fxRate, new Date()), [ledger, fxRate]);
+}
+
+/**
+ * The whole financial picture, from the one entry point.
+ *
+ * Screens should read this rather than calling domain functions individually:
+ * the figures here are guaranteed to describe the same goal, the same month
+ * and the same instant, which separate calls were not. `state.detail` holds
+ * everything `useSafeSpend` returned, so a screen can move across a field at
+ * a time.
+ */
+export function useFinancialState(): FinancialState {
+  const ledger = useLedger((s) => s.ledger);
+  const fxRate = useLedger((s) => s.settings.fxRate);
+  return useMemo(
+    () => evaluateFinancialState(ledger, new Date(), { fx: fxRate }),
+    [ledger, fxRate],
+  );
 }
 
 export function useCardPosition(): CardPosition {

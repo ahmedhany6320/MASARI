@@ -8,9 +8,9 @@ import { QuickAdd } from '../../src/components/QuickAdd';
 import { QuickAction } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../src/components/ui';
 import { formatShortDate } from '../../src/i18n';
-import { useLocalization, usePalette, useSafeSpend } from '../../src/store/selectors';
+import { useFinancialState, useLocalization, usePalette } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
-import { forecast, forecastFromLedger, spendLadder, steeringGoal } from '../../src/domain';
+import { spendLadder, steeringGoal } from '../../src/domain';
 import { FONT, SPACE } from '../../src/theme/tokens';
 import { version as APP_VERSION } from '../../package.json';
 
@@ -23,7 +23,17 @@ import { version as APP_VERSION } from '../../package.json';
  * buried under the arithmetic that produced it.
  */
 export default function HomeScreen() {
-  const c = useSafeSpend();
+  /*
+   * One evaluation, read by everything on this screen.
+   *
+   * Home used to call `useSafeSpend` and then rebuild the forecast inline from
+   * its fields, so two things on the same screen could describe different
+   * months. `state.detail` is the same object `useSafeSpend` returned, so the
+   * rest of this file is unchanged — but the forecast now comes from the same
+   * evaluation as the headline above it.
+   */
+  const state = useFinancialState();
+  const c = state.detail;
   const { t, money, num, rtl, lang } = useLocalization();
   const p = usePalette();
   const insets = useSafeAreaInsets();
@@ -37,37 +47,7 @@ export default function HomeScreen() {
   const steeringGoalNow = steeringGoal(c.goals);
 
   // Two months is all Home needs: this one, and the one the next salary opens.
-  const ahead = useMemo(() => {
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const plannedCommitments = ledger.commits
-      .filter((k) => !k.paused)
-      .reduce((a, k) => a + (k.amt ?? 0), 0);
-    const plannedTransfers = ledger.planTf.reduce((a, tf) => a + tf.amt, 0);
-
-    return forecast(
-      forecastFromLedger(
-        ledger,
-        {
-          bank: c.bank,
-          cash: c.cash,
-          commitObl: c.commitObl,
-          planT: c.planT,
-          cardDue: c.cardDue,
-          cardNextBill: c.cardClaim.billNext,
-          goalReq: c.goalReq,
-          livingPool: c.livingPool,
-          cycleSpend: c.cycleSpend,
-          daysLeft: c.daysLeft,
-          daysInMonth,
-        },
-        plannedCommitments,
-        plannedTransfers,
-      ),
-      2,
-      now,
-    );
-  }, [ledger, c]);
+  const ahead = useMemo(() => state.forecast.slice(0, 2), [state]);
 
   // The limit is the headline, but an overspent day needs to say so plainly
   // rather than just showing zero.

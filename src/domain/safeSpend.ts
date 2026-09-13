@@ -12,7 +12,7 @@ import { commitmentsDue, type CommitmentsDue } from './commitments';
 import { varianceReport, type VarianceReport } from './variance';
 import { fundedGoals, fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
-import { dailyBudget, project, type Projection } from './projection';
+import { dailyBudget, project, type DailyBudget, type Projection } from './projection';
 import {
   projectAtPace,
   spendPlan,
@@ -21,6 +21,13 @@ import {
   type SpendPlan,
 } from './spendPlan';
 import type { Goal, Ledger } from './types';
+
+/**
+ * The share of an underspend that goes to the goal rather than staying
+ * spendable. Half, so a careful week is rewarded without the saving vanishing
+ * the moment it appears — the rest stays available for the days that follow.
+ */
+export const UNDERSPEND_BANK_SHARE = 0.5;
 
 export interface SafeSpend {
   bank: number;
@@ -88,6 +95,14 @@ export interface SafeSpend {
   goalAsked: number;
   /** How much the living floor held back from the goal. */
   goalHeldBack: number;
+  /**
+   * Money the month leaves over once living and the goal are both funded.
+   *
+   * Not the goal's: its schedule is already satisfied. Surfaced rather than
+   * folded into another total, because a figure with no name is where the
+   * goal contribution silently inflated before.
+   */
+  surplus: number;
   /** The declared living floor, per month. Zero when none is set. */
   floorMonthly: number;
   /**
@@ -130,6 +145,15 @@ export interface SafeSpend {
   /** What the steering goal is actually worth at the current pace. */
   targetAdapted: TargetAdaptation | null;
   /**
+   * How `allowance` was arrived at: the planned pace, the strict figure, the
+   * smoothing between them and what the floor refused to take. Present
+   * whenever a range is declared.
+   *
+   * Exposed so a screen can show its working from the same object the number
+   * came from, rather than recomputing a version of it that drifts.
+   */
+  dailyDerivation: DailyBudget | null;
+  /**
    * THE monthly contribution to the goal: its reserved share, plus the half of
    * any underspend the daily loop banked, plus whatever obligations left over
    * by coming in under budget.
@@ -140,6 +164,10 @@ export interface SafeSpend {
    * 409,958, 407,261, null and NaN — with two of those on the same screen.
    */
   goalMonthly: number;
+  /** Of `goalMonthly`, the part that came from spending under plan. */
+  bankedToGoal: number;
+  /** What honouring the living floor cost the goal this month. */
+  goalAbsorbed: number;
   /** Which basis produced the figures above. */
   basis: 'salary' | 'balance' | 'goal';
   /**
@@ -310,6 +338,21 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    */
   const band = livingBand(s.minDailySpend, s.comfortDailySpend);
   const hasBand = band.min > 0 || band.comfort > 0;
+
+  /*
+   * The projection is the source of truth for the monthly budget, and both the
+   * daily figure AND the goal contribution fall out of it. The old path — a
+   * one-line residual divided by the days remaining — is kept only for a
+   * ledger with no declared range, where there is nothing to project against.
+   *
+   * It is built here, before anything reads it, because the order matters:
+   * the month's living budget is decided first and the goal takes what the
+   * month does not need. Deciding the goal first and dividing the remainder
+   * is how the old formula produced a daily figure nobody could live on.
+   */
+  const projection = hasBand
+    ? project({ ledger: s, fx, now, range: { min: band.min, comfort: band.comfort } })
+    : null;
   const planFloorDaily = band.comfort > 0 ? band.comfort : Math.max(0, s.minDailySpend ?? 0);
   const floorMonthly = planFloorDaily * daysInMonth;
   const basisPool = s.sslBasis === 'balance' ? bank + (cash ?? 0) : s.base;
@@ -366,12 +409,51 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * the contribution falls to zero on its own and the goal gets the full
    * surplus again.
    */
-  const goalReq = planSteers
-    ? plan.monthlyToGoal
-    : Math.min(goalAsked, Math.max(0, poolAfterBuffer - floorMonthly));
+  /*
+   * ONE authority for the goal contribution, and it is the projection.
+   *
+   * Until now the daily figure came from the projection while the goal
+   * contribution came from `spendPlan` — two engines, never reconciled, both
+   * rendered on screen. On one real ledger that produced a daily limit of 50
+   * beside a goal contribution of 4,346, while the projection those 50 came
+   * from implied 9,800 a month going to the goal. Three answers to one
+   * question, all displayed at once.
+   *
+   * The projection decides what the month may spend. The goal then takes what
+   * is left of the pool — but never more than the goal's own schedule asks
+   * for, because a goal that needs 3,200 a month is not helped by being
+   * handed 9,800, and reporting that it was is simply false.
+   *
+   * `floorMonthly` still bounds the fallback path, for a ledger with no
+   * declared range where there is no projection to read.
+   */
+  const projectedMonthlyLiving = projection?.monthlyDiscretionary ?? null;
+  const goalCapacity =
+    projectedMonthlyLiving != null
+      ? Math.max(0, poolAfterBuffer - projectedMonthlyLiving)
+      : Math.max(0, poolAfterBuffer - floorMonthly);
+
+  const goalReq =
+    projection != null
+      ? Math.min(goalAsked, goalCapacity)
+      : planSteers
+        ? plan.monthlyToGoal
+        : Math.min(goalAsked, goalCapacity);
   // On the goal basis this reads as "how much less the goal gets than a
   // target-driven schedule would have demanded" — the price of staying livable.
   const goalHeldBack = Math.max(0, goalAsked - goalReq);
+
+  /*
+   * What the month leaves over once living and the goal are both paid for.
+   *
+   * It exists because the lifestyle range is a genuine ceiling: the user asked
+   * to live on 20–40 a day and bank the rest, so a comfortable month on a good
+   * salary leaves real money spoken for by nothing. That money is not the
+   * goal's — the goal's schedule is already satisfied — and pretending
+   * otherwise was how the goal figure came to be inflated. Naming it is the
+   * honest alternative to hiding it inside another total.
+   */
+  const surplus = Math.max(0, goalCapacity - goalReq);
 
   /*
    * Commitment settlements are excluded. Paying the rent is real spending and
@@ -445,6 +527,17 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * them — while the survival floor holds regardless and the goal absorbs any
    * deficit that would otherwise breach it.
    */
+  const projected = projection
+    ? dailyBudget({
+        monthlyDiscretionary: projection.monthlyDiscretionary,
+        spent: cycleSpend,
+        daysElapsed: dom,
+        daysLeft,
+        daysInMonth,
+        range: projection.range,
+      })
+    : null;
+
   const daily = hasBand
     ? adaptDaily({
         livingBudget: Math.max(0, livingPool),
@@ -459,29 +552,25 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   /*
    * The single figure every projection is built from. Assembled here, once,
    * so no caller can reconstruct a slightly different version of it.
+   *
+   * It is measured against the daily figure ACTUALLY IN FORCE. It used to
+   * read `daily.bankedToGoal` — computed by the legacy loop from a daily
+   * number the app had already stopped showing — so the goal was credited
+   * with savings against a plan nobody was following. On one real ledger the
+   * shown allowance was 50 a day while the figure behind this credit was 254.
+   *
+   * And it now SUBTRACTS what the goal had to absorb. Honouring the living
+   * floor in an overspent month costs the goal real money; reporting the
+   * credit without the debit made the goal look like it only ever gained.
    */
-  const goalMonthly = goalReq + (daily?.bankedToGoal ?? 0) + variance.toGoal;
-
-  /*
-   * The projection is the source of truth for the monthly budget, and the
-   * daily figure falls out of it. The old path — a one-line residual divided
-   * by the days remaining — is kept only for a ledger with no declared range,
-   * where there is nothing to project against.
-   */
-  const projection = hasBand
-    ? project({ ledger: s, fx, now, range: { min: band.min, comfort: band.comfort } })
-    : null;
-
-  const projected = projection
-    ? dailyBudget({
-        monthlyDiscretionary: projection.monthlyDiscretionary,
-        spent: cycleSpend,
-        daysElapsed: dom,
-        daysLeft,
-        daysInMonth,
-        range: projection.range,
-      })
-    : null;
+  const bankedToGoal = projected
+    ? Math.max(0, projected.variance) * UNDERSPEND_BANK_SHARE
+    : (daily?.bankedToGoal ?? 0);
+  const goalAbsorbed = projected ? projected.absorbed : (daily?.goalAbsorbed ?? 0);
+  const goalMonthly = Math.max(
+    0,
+    goalReq + bankedToGoal + variance.toGoal - goalAbsorbed,
+  );
 
   const allowance = projected
     ? projected.today
@@ -520,6 +609,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     goalReq,
     goalAsked,
     goalHeldBack,
+    surplus,
     floorMonthly,
     bufferReq,
     bufferTarget,
@@ -536,10 +626,13 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     band,
     daily,
     goalMonthly,
+    bankedToGoal,
+    goalAbsorbed,
     targetAdapted:
       steering != null
         ? adaptTarget(steering, goalMonthly, steering.months ?? 0, steering.alloc, fx)
         : null,
+    dailyDerivation: projected,
     plan,
     planInputs,
     planProjected:

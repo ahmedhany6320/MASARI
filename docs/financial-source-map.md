@@ -24,6 +24,17 @@ screens (app/**)            read only from the domain barrel and the store
             └── src/lib     storage, Supabase, notifications — no arithmetic
 ```
 
+**The front door.** `domain/engine.ts` exports `evaluateFinancialState(ledger,
+asOf, options)`. It is not a rewrite — it forwards to `safeSpend` and carries
+its whole result as `detail` — but it is the one place the contract is
+enforced rather than described. It guarantees a single goal identity, a single
+daily figure and a single monthly goal contribution, and it returns
+`consistency`: the relationships the contract requires, re-derived from the
+outputs. The tests assert that list is empty, and separately assert that
+corrupting any one figure makes the matching rule fire, so the harness cannot
+quietly become a no-op. Screens migrate onto it one at a time; Home is the
+first.
+
 `src/domain/index.ts` re-exports every module, so every screen imports from one
 barrel. That is why the import lists below are the honest surface: there is no
 back channel.
@@ -139,7 +150,7 @@ Internet 300 and a planned transfer of 850, after the preview and regardless of
 what was entered. These are the author's own figures. This breaks §11: the
 first thing a new user sees is someone else's rent presented as their own.
 
-### D5 — More than one function answers the same question. *(confirmed, severity: medium)*
+### D5 — More than one function answers the same question. *(confirmed, severity: HIGH — worse than first assessed; addressed in Phase 2)*
 
 `projection.ts:346` duplicates the goal-selection rule that
 `spendPlan.ts:208` already owns as `steeringGoal`. They agree today, which is
@@ -151,6 +162,34 @@ The selected-goal problem is real but narrower than reported: both functions
 take the **first** goal with a positive target and a positive duration, while
 `app/goal-plan.tsx` renders whichever goal the user is looking at. With more
 than one such goal, the headline and the detail describe different goals.
+That part is Phase 4.
+
+**What measurement found, which was worse.** `safeSpend` was running two
+plans side by side and rendering both. The daily allowance came from
+`projection`; the monthly goal contribution came from `spendPlan`; the banked
+underspend came from `adaptDaily`, which had computed a third daily figure of
+its own. On the real August ledger, at one instant:
+
+| Figure | Value | Source |
+|---|---|---|
+| Daily allowance shown | 50.37 | `projection` → `dailyBudget` |
+| Daily figure behind the goal credit | 254.30 | `adaptDaily` |
+| Daily figure the plan assumed | 190.72 | `spendPlan` |
+| Monthly goal contribution reported | 4,345.86 | `spendPlan` + `adaptDaily` |
+| Monthly goal implied by the shown daily figure | 9,800 | `projection` |
+
+Living at 50 a day for a month is 1,200 against a capacity of 11,000 — so the
+screen showing 4,346 and the screen showing 50 were describing different
+months, and the goal was being credited with savings measured against a plan
+the app had stopped showing.
+
+**Fixed in Phase 2.** The projection is now the sole authority for both. The
+goal takes what the month does not spend, capped at what its own schedule
+asks for, and what remains above that is reported as a named `surplus`
+instead of silently inflating the goal. `goalMonthly` is measured against the
+daily figure actually in force and now subtracts `goalAbsorbed` — honouring
+the living floor in an overspent month costs the goal real money, and only
+the credit was ever reported.
 
 ### D6 — Web build artefact. *(not reproducible here)*
 
