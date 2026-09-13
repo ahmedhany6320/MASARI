@@ -75,10 +75,38 @@ export function drawsFromBalance(g: Goal): boolean {
   return g.auto || g.alloc <= 0;
 }
 
-export function fundGoals(goals: Goal[], liquid: number, fx: number): FundingPlan {
+/**
+ * Which goals get the balance first, when there is not enough for all of them.
+ *
+ * List order is the user's statement of priority and stays the default. The
+ * one exception is the goal they have chosen to work toward: funding it
+ * second would have the app steer spending by a goal it was starving, which
+ * is the opposite of what choosing it meant.
+ *
+ * Returns the ORDER TO FUND IN. The plan itself is rebuilt in list order, so
+ * nothing downstream sees the goals move around.
+ */
+function fundingOrder(goals: Goal[], priorityId?: string | null): Goal[] {
+  if (!priorityId) return goals;
+  const first = goals.find((g) => g.id === priorityId);
+  if (!first) return goals;
+  return [first, ...goals.filter((g) => g.id !== priorityId)];
+}
+
+export function fundGoals(
+  goals: Goal[],
+  liquid: number,
+  fx: number,
+  priorityId?: string | null,
+): FundingPlan {
   let left = Math.max(0, liquid);
 
-  const out = goals.map((g): GoalFunding => {
+  const funded = new Map<string, GoalFunding>();
+  for (const g of fundingOrder(goals, priorityId)) {
+    funded.set(g.id, fundOne(g));
+  }
+
+  function fundOne(g: Goal): GoalFunding {
     if (!drawsFromBalance(g)) {
       /*
        * Declared by hand and taken at face value, uncapped and without
@@ -107,18 +135,22 @@ export function fundGoals(goals: Goal[], liquid: number, fx: number): FundingPla
     const held = Math.min(wanted, left);
     left -= held;
     return { goal: g, held, fromBalance: true, wanted, short: wanted - held };
-  });
+  }
+
+  // Rebuilt in the user's list order: the funding ORDER decides who gets the
+  // money, the list order decides how it is shown.
+  const out = goals.map((g) => funded.get(g.id) as GoalFunding);
 
   const have = Math.max(0, liquid);
-  const funded = out.reduce((a, x) => a + x.held, 0);
+  const total = out.reduce((a, x) => a + x.held, 0);
 
   return {
     goals: out,
     free: left,
-    funded,
+    funded: total,
     wanted: out.reduce((a, x) => a + x.wanted, 0),
     liquid: have,
-    overAllocated: funded > have,
+    overAllocated: total > have,
     ratio: have > 0 ? Math.min(1, (have - left) / have) : 0,
   };
 }

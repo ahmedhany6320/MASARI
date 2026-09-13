@@ -201,12 +201,31 @@ export function spendLadder(
   return out;
 }
 
+/** Whether a goal is capable of steering: it has somewhere to get to, and a date. */
+export function canSteer(g: Goal): boolean {
+  return g.target != null && g.target > 0 && !!g.months && g.months > 0;
+}
+
 /**
- * Picks the goal that steers spending: the first with both a target and a
- * duration. Ordering is the user's, so it doubles as a statement of priority.
+ * Picks the goal that steers spending.
+ *
+ * The user's explicit choice wins. Without one it is the first goal with both
+ * a target and a duration, and list order doubles as a statement of priority.
+ *
+ * This is the ONLY place that rule lives. It used to be written out again
+ * inside `project()`, which meant two functions chose the steering goal
+ * independently and nothing forced them to keep agreeing — while the goal
+ * screen showed whichever goal the user had tapped. With more than one dated
+ * goal, the daily limit was steered by one goal and displayed against another.
  */
-export function steeringGoal(goals: Goal[]): Goal | null {
-  return goals.find((g) => g.target != null && g.target > 0 && !!g.months && g.months > 0) ?? null;
+export function steeringGoal(goals: Goal[], preferredId?: string | null): Goal | null {
+  if (preferredId) {
+    const chosen = goals.find((g) => g.id === preferredId);
+    // An explicit choice that can no longer steer — its date was cleared, say
+    // — falls back rather than leaving the app with no plan at all.
+    if (chosen && canSteer(chosen)) return chosen;
+  }
+  return goals.find(canSteer) ?? null;
 }
 
 /**

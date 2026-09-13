@@ -10,7 +10,7 @@ import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../../sr
 import { formatShortDate } from '../../src/i18n';
 import { useFinancialState, useLocalization, usePalette } from '../../src/store/selectors';
 import { useLedger } from '../../src/store/useLedger';
-import { spendLadder, steeringGoal } from '../../src/domain';
+import { spendLadder } from '../../src/domain';
 import { FONT, SPACE } from '../../src/theme/tokens';
 import { version as APP_VERSION } from '../../package.json';
 
@@ -42,9 +42,10 @@ export default function HomeScreen() {
 
   const ledger = useLedger((s) => s.ledger);
   const seedObligations = useLedger((s) => s.seedObligations);
-  // The goal steering the plan, read from the engine's funded goals so its
-  // progress matches what the plan was built from.
-  const steeringGoalNow = steeringGoal(c.goals);
+  // The goal steering the plan, taken from the evaluation rather than chosen
+  // again here — so this screen and the projection can never disagree on which
+  // goal the numbers are about.
+  const steeringGoalNow = c.steering;
 
   // Two months is all Home needs: this one, and the one the next salary opens.
   const ahead = useMemo(() => state.forecast.slice(0, 2), [state]);

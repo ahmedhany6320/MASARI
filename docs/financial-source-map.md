@@ -250,6 +250,41 @@ settlements for one month would hand the goal the same variance twice. The
 single-cycle fields are kept in step so nothing reading them changed and an
 older build still loads the save.
 
+### D11 — Three definitions of "spending". *(found in Phase 4, severity: high)*
+
+The daily limit counted posted expenses excluding commitment settlements. The
+floor recommender counted posted expenses *including* them. Insights counted
+every expense row including the non-posting ones already baked into the
+opening balance — despite a comment there claiming otherwise.
+
+Two of those produced visibly wrong numbers:
+
+- `burnRate` projected the month from a total containing the rent and compared
+  it against `livingPool`, which has the rent taken out. It therefore announced
+  an overrun roughly the size of the rent, every month, from the 1st.
+- `recommendFloor` read a percentile of daily totals with the rent in them, so
+  it proposed a living floor inflated by a bill that is not living — and the
+  difference came straight out of the goal.
+
+`classify.ts` now owns the definition: `isDiscretionary` (what a daily limit
+governs), `isOutgoing` (every expense that moves money), `counts` (posts at
+all). `safeSpend`, `floor` and `insights` all read it.
+
+### D12 — The goal on screen was not the goal being steered. *(the rest of D5, fixed in Phase 4)*
+
+`project()` wrote the steering-goal rule out for itself instead of calling
+`steeringGoal`, so two functions chose independently — while `goal-plan.tsx`
+rendered whichever goal the user had tapped and applied the *steering* goal's
+monthly contribution to it. With more than one dated goal, the landing date
+shown for goal B was computed from goal A's savings.
+
+`steeringGoal(goals, preferredId)` is now the only place that rule lives.
+`Ledger.steerGoalId` records an explicit choice and falls back to list order,
+`SafeSpend.steering` exposes it so screens stop choosing again, and the goal
+screen says plainly when what it is showing is not what the daily limit is
+working toward. The chosen goal is also funded from the balance first —
+steering by a goal the balance was starving is the opposite of choosing it.
+
 ## 5. Order of work
 
 Data protection first, then import/sync, then the engine, then the screens —

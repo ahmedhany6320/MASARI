@@ -160,6 +160,8 @@ export interface LedgerStore {
     spentThisCycle: number;
   }) => void;
   setSavingsTarget: (target: number | null) => void;
+  /** Choose which goal steers spending. `null` restores the default. */
+  setSteeringGoal: (id: string | null) => void;
   /** The least the user can live on per day — goals may never breach it. */
   setMinDailySpend: (amount: number | null) => void;
   /** The top of the living band: a balanced day rather than a tight one. */
@@ -518,6 +520,15 @@ export const useLedger = create<LedgerStore>()(
           },
         })),
       setSavingsTarget: (savTarget) => set((s) => ({ ledger: { ...s.ledger, savTarget } })),
+
+      /*
+       * Which goal steers spending. Without an explicit choice the app takes
+       * the first dated goal, which is fine with one goal and arbitrary with
+       * several — and the goal screen would then render a different goal from
+       * the one the daily limit was actually working toward.
+       */
+      setSteeringGoal: (steerGoalId) =>
+        set((s) => ({ ledger: { ...s.ledger, steerGoalId } })),
 
       setComfortDailySpend: (amount) =>
         set((st) => ({

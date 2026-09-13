@@ -36,6 +36,7 @@ export const UNSYNCED_LEDGER_FIELDS = [
   'bufferTarget',
   'goalMode',
   'salFor',
+  'steerGoalId',
 ] as const;
 
 /** Per-row fields the remote columns do not cover. */
@@ -96,6 +97,7 @@ export function mergeRelationalPull(remote: Ledger, local: Ledger): Ledger {
     // status has no month, and an unstamped status reads as current — so a
     // pull would re-assert a salary that landed three months ago.
     salFor: remote.salFor ?? local.salFor,
+    steerGoalId: remote.steerGoalId ?? local.steerGoalId,
 
     tx: remote.tx.map((x) => keep(x, localTx.get(x.id), UNSYNCED_TX_FIELDS)),
     commits: remote.commits.map((k) =>

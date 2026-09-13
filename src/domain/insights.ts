@@ -1,3 +1,4 @@
+import { isDiscretionary } from './classify';
 import { isEgpGoal } from './goals';
 import type { Goal, Ledger, Tx } from './types';
 
@@ -41,9 +42,21 @@ export interface WeekdayStat {
   average: number;
 }
 
-/** Expenses only, within the window, excluding non-posting history. */
+/**
+ * Discretionary spending within the window.
+ *
+ * It used to be every expense row with a matching date — including the
+ * non-posting ones already baked into the opening balance, despite the
+ * comment here saying otherwise, and including commitment settlements.
+ *
+ * Both mattered. `burnRate` projected the month from this total and compared
+ * it against `livingPool`, which has commitments taken out, so it reported an
+ * overrun the size of the rent every month. And every "how do I spend"
+ * statistic was shaped by bills the user has no choice about, which is not
+ * what any of them are for.
+ */
 function expensesSince(ledger: Ledger, since: number): Tx[] {
-  return ledger.tx.filter((x) => x.type === 'expense' && x.ts >= since);
+  return ledger.tx.filter((x) => isDiscretionary(x) && x.ts >= since);
 }
 
 /** Merchant names are matched case-insensitively and trimmed. */
@@ -357,7 +370,7 @@ export function monthComparison(ledger: Ledger, now: Date): SpendingComparison {
 
   const sum = (from: number, to: number) =>
     ledger.tx
-      .filter((x) => x.type === 'expense' && x.ts >= from && x.ts < to)
+      .filter((x) => isDiscretionary(x) && x.ts >= from && x.ts < to)
       .reduce((a, x) => a + x.amt, 0);
 
   const thisMonth = sum(thisStart, now.getTime() + 1);

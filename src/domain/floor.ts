@@ -1,4 +1,4 @@
-import { posts } from './balances';
+import { isDiscretionary } from './classify';
 import type { Ledger, Tx } from './types';
 
 /**
@@ -32,7 +32,15 @@ export function dailyTotals(ledger: Pick<Ledger, 'tx'>, from: number, to: number
   const byDay = new Map<string, number>();
 
   for (const x of ledger.tx) {
-    if (x.type !== 'expense' || !posts(x as Tx)) continue;
+    /*
+     * Discretionary only. The floor answers "what is the least I can live on
+     * in a day", and a commitment settlement is not living — it is a bill the
+     * user has no choice about, already taken out of the pool the floor is
+     * measured against. Counting the rent on the 1st inflated the percentile
+     * this reads, so the app proposed a floor larger than any real day and
+     * took the difference straight out of the goal.
+     */
+    if (!isDiscretionary(x as Tx)) continue;
     if (x.ts < from || x.ts > to) continue;
     const d = new Date(x.ts);
     const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;

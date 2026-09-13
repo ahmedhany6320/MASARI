@@ -63,6 +63,7 @@ export function buildBackup(
       tx: ledger.tx,
       rules: ledger.rules,
       savTarget: ledger.savTarget,
+      steerGoalId: ledger.steerGoalId ?? null,
 
       // Fields this app added. The importer ignores anything it does not know,
       // so including them is safe for the older app too.

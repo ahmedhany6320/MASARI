@@ -85,6 +85,7 @@ export function importBackup(raw: unknown): ImportResult {
   // The cycle the salary status belongs to; without it the status never expires.
   led.salFor = typeof d.salFor === 'string' ? d.salFor : null;
   led.savTarget = num(d.savTarget);
+  led.steerGoalId = typeof d.steerGoalId === 'string' ? d.steerGoalId : null;
 
   // ---- card ---------------------------------------------------------------
   const cfg = (d.cardCfg ?? {}) as Record<string, unknown>;

@@ -168,6 +168,7 @@ function fullLedger(): Ledger {
 
     rules: { carrefour: catFood, du: catBills },
     savTarget: 2_000,
+    steerGoalId: 'egypt',
     baseline: { ts: Date.UTC(2026, 5, 1), cycleSpentBefore: 430.75 },
     minDailySpend: 20,
     comfortDailySpend: 40,

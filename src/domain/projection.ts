@@ -3,6 +3,7 @@ import { cardPosition } from './card';
 import { commitmentsDue } from './commitments';
 import { cycleKey } from './commitments';
 import { isEgpGoal } from './goals';
+import { steeringGoal } from './spendPlan';
 import type { Goal, Ledger } from './types';
 
 /**
@@ -342,9 +343,12 @@ function daysIn(m: MonthProjection, now: Date): number {
 /** Builds the whole projection. */
 export function project(inp: ProjectionInput): Projection {
   const { ledger, now, range } = inp;
-  const goal =
-    ledger.goals.find((g) => g.target != null && g.target > 0 && !!g.months && g.months > 0) ??
-    null;
+  /*
+   * One rule for choosing the steering goal, and it lives in `spendPlan`.
+   * This used to write it out again, so two functions picked independently
+   * and nothing kept them in step.
+   */
+  const goal = steeringGoal(ledger.goals, ledger.steerGoalId);
 
   const months = Math.max(1, inp.months ?? goal?.months ?? 12);
 

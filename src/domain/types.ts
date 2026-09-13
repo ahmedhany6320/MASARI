@@ -337,6 +337,17 @@ export interface Ledger {
 
   savTarget: number | null;
 
+  /**
+   * The goal the user has chosen to steer spending, when they have chosen one.
+   *
+   * Without it the steering goal is simply the first dated one in the list,
+   * which is a reasonable default and a poor answer when there are several:
+   * the daily limit was steered by one goal while the goal screen rendered
+   * whichever the user had tapped, and applied the steering goal's monthly
+   * contribution to it.
+   */
+  steerGoalId?: string | null;
+
   /** Set when the user started fresh from a declared position. */
   baseline?: Baseline | null;
 

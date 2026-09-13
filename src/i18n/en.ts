@@ -367,6 +367,11 @@ export const en: Record<StringKey, string> = {
   closeDay: 'Statement day',
   dueDay: 'Payment due day',
   edit: 'Edit',
+  notSteeringT: 'Not the goal you are working toward',
+  notSteeringS:
+    'Your daily limit is being worked out from {goal}. The figures below show what would happen if this goal steered instead.',
+  makeSteering: 'Work toward this one',
+  steeringNow: 'Steering your daily limit',
   stmtCycleT: 'Statement cycle',
   stmtBilled: 'Billed and payable',
   stmtSinceClose: 'Spent since it closed',

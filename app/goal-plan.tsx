@@ -45,6 +45,7 @@ export default function GoalPlanScreen() {
   const updateGoal = useLedger((s) => s.updateGoal);
   const setMinDailySpend = useLedger((s) => s.setMinDailySpend);
   const setGoalMode = useLedger((s) => s.setGoalMode);
+  const setSteeringGoal = useLedger((s) => s.setSteeringGoal);
   const capacity = useCapacity();
   const spend = useSafeSpend();
 
@@ -58,6 +59,18 @@ export default function GoalPlanScreen() {
   const goals = spend.goals.filter((g) => g.target != null);
   const [selectedId, setSelectedId] = useState<string | null>(params.id ?? goals[0]?.id ?? null);
   const goal = goals.find((g) => g.id === selectedId) ?? goals[0] ?? null;
+
+  /*
+   * Which goal is actually steering the daily limit.
+   *
+   * The screen renders whichever goal was tapped, while `spend.goalMonthly`
+   * and everything derived from it describe the goal that steers. With more
+   * than one dated goal those were different goals and nothing said so — the
+   * screen applied one goal's monthly contribution to another goal's target
+   * and reported the landing date as fact.
+   */
+  const steering = spend.steering;
+  const isSteering = steering != null && goal != null && steering.id === goal.id;
 
   const [horizon, setHorizon] = useState<number>(12);
   const [editing, setEditing] = useState(false);
@@ -159,9 +172,30 @@ export default function GoalPlanScreen() {
           />
         )}
 
+        {/*
+          * Say plainly when the goal on screen is not the one the daily limit
+          * is being worked out from, rather than presenting one goal's
+          * contribution against another goal's target as though it were fact.
+          */}
+        {!isSteering && steering != null && (
+          <Card>
+            <Title>{t('notSteeringT')}</Title>
+            <Caption>{t('notSteeringS').replace('{goal}', steering[lang])}</Caption>
+            <View style={{ marginTop: SPACE.md }}>
+              <Button
+                label={t('makeSteering')}
+                onPress={() => setSteeringGoal(goal.id)}
+              />
+            </View>
+          </Card>
+        )}
+
         {/* ---- where I stand ---- */}
         <Card>
-          <Caption>{goal[lang]}</Caption>
+          <Caption>
+            {goal[lang]}
+            {isSteering ? ` · ${t('steeringNow')}` : ''}
+          </Caption>
           <Text style={[styles.hero, { color: p.accent, textAlign: rtl ? 'right' : 'left' }]}>
             {fmt(plan.target)}
           </Text>

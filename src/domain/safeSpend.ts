@@ -1,4 +1,5 @@
 import { bankBalance, cashBalance } from './balances';
+import { discretionaryTotal } from './classify';
 import { cardCarryover, cardClaim, cardPosition, type CardClaim, type CardPosition } from './card';
 import {
   adaptDaily,
@@ -168,6 +169,14 @@ export interface SafeSpend {
   bankedToGoal: number;
   /** What honouring the living floor cost the goal this month. */
   goalAbsorbed: number;
+  /**
+   * The goal that steers spending, and that every goal figure above refers to.
+   *
+   * Exposed so a screen reads it rather than choosing again: Home used to call
+   * `steeringGoal` itself, which was right only for as long as nobody changed
+   * the rule in one place and not the other.
+   */
+  steering: Goal | null;
   /** Which basis produced the figures above. */
   basis: 'salary' | 'balance' | 'goal';
   /**
@@ -252,7 +261,9 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
   const bufferShort = Math.max(0, bufferTarget - bufferHeld);
   const bufferFunded = bufferShort <= 0;
 
-  const funding = fundGoals(s.goals, liquid - bufferHeld, fx);
+  // The goal the user chose to work toward is funded first. Steering by a
+  // goal the balance was starving is the opposite of what choosing it meant.
+  const funding = fundGoals(s.goals, liquid - bufferHeld, fx, s.steerGoalId);
   const protectedAlloc = funding.funded;
   /*
    * Commitments are scheduled rather than summed. The old filter deducted
@@ -372,7 +383,8 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
 
   const poolAfterBuffer = Math.max(0, poolBeforeGoal - bufferReq);
 
-  const steering = steeringGoal(goals);
+  // The same choice the projection makes, from the same function.
+  const steering = steeringGoal(goals, s.steerGoalId);
   const planInputs: PlanInputs | null =
     steering != null
       ? {
@@ -462,11 +474,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    * same 1,800 out of the living allowance twice and leave the month looking
    * ruined the day the rent clears.
    */
-  const cycleSpend =
-    spentBefore +
-    s.tx
-      .filter((x) => x.type === 'expense' && x.ts >= countFrom && x.commitId == null)
-      .reduce((a, x) => a + x.amt, 0);
+  const cycleSpend = spentBefore + discretionaryTotal(s, countFrom);
 
   /*
    * Two ways to size the pool, and the right one depends on what the app
@@ -503,9 +511,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
 
   // Today's spending is likewise counted only from the baseline forward.
   const todayFrom = baseTs != null ? Math.max(dayStart, baseTs) : dayStart;
-  const flexToday = s.tx
-    .filter((x) => x.type === 'expense' && x.ts >= todayFrom && x.commitId == null)
-    .reduce((a, x) => a + x.amt, 0);
+  const flexToday = discretionaryTotal(s, todayFrom);
 
   /*
    * On the goal basis the daily figure is the PLAN'S, held steady for the
@@ -622,6 +628,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     flexToday,
     allowance,
     ssl,
+    steering,
     basis,
     band,
     daily,

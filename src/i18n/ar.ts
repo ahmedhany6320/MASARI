@@ -365,6 +365,11 @@ export const ar = {
   closeDay: 'يوم إصدار الكشف',
   dueDay: 'آخر يوم للسداد',
   edit: 'تعديل',
+  notSteeringT: 'مش ده الهدف اللي شغال عليه',
+  notSteeringS:
+    'الحد اليومي بيتحسب من {goal}. الأرقام اللي تحت بتوريك هيحصل إيه لو الهدف ده هو اللي بيقود بدل منه.',
+  makeSteering: 'خليه هو الهدف',
+  steeringNow: 'ده اللي بيحدد حدك اليومي',
   stmtCycleT: 'دورة كشف الحساب',
   stmtBilled: 'مطلوب سداده',
   stmtSinceClose: 'مصروف بعد إصدار الكشف',
