@@ -12,6 +12,7 @@ import { commitmentsDue, type CommitmentsDue } from './commitments';
 import { varianceReport, type VarianceReport } from './variance';
 import { fundedGoals, fundGoals, type FundingPlan } from './funding';
 import { goalsMonthlyRequirement } from './goals';
+import { dailyBudget, project, type Projection } from './projection';
 import {
   projectAtPace,
   spendPlan,
@@ -70,6 +71,15 @@ export interface SafeSpend {
   cardCycleUnbilled: number;
   /** The full, auditable statement of what the card claims and when. */
   cardClaim: CardClaim;
+  /**
+   * The cash-flow projection to the goal's date, and the single source every
+   * screen reads for net position, monthly spend and the projected goal.
+   *
+   * Present whenever a living range is declared. The daily figure below is
+   * DERIVED from its monthly discretionary budget rather than computed on its
+   * own — which is the whole point of it existing.
+   */
+  projection: Projection | null;
   /** Planned international transfers. */
   planT: number;
   /** Monthly goal contribution actually reserved, after protecting the floor. */
@@ -452,7 +462,30 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
    */
   const goalMonthly = goalReq + (daily?.bankedToGoal ?? 0) + variance.toGoal;
 
-  const allowance = daily
+  /*
+   * The projection is the source of truth for the monthly budget, and the
+   * daily figure falls out of it. The old path — a one-line residual divided
+   * by the days remaining — is kept only for a ledger with no declared range,
+   * where there is nothing to project against.
+   */
+  const projection = hasBand
+    ? project({ ledger: s, fx, now, range: { min: band.min, comfort: band.comfort } })
+    : null;
+
+  const projected = projection
+    ? dailyBudget({
+        monthlyDiscretionary: projection.monthlyDiscretionary,
+        spent: cycleSpend,
+        daysElapsed: dom,
+        daysLeft,
+        daysInMonth,
+        range: projection.range,
+      })
+    : null;
+
+  const allowance = projected
+    ? projected.today
+    : daily
     ? daily.today
     : planSteers
       ? plan.dailyAllowance
@@ -482,6 +515,7 @@ export function safeSpend(s: Ledger, fx: number, now: Date = new Date()): SafeSp
     },
     cardCycleUnbilled: carry.unbilledCycle,
     cardClaim: cardClaim(s, countFrom, now),
+    projection,
     planT,
     goalReq,
     goalAsked,

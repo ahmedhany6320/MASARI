@@ -210,6 +210,29 @@ export default function InsightsScreen() {
           ]}
         />
 
+        {/* The same projection Home and the goal plan read, so the three
+            screens cannot report different positions. */}
+        {c.projection != null && (
+          <Card>
+            <Title>{t('pjNetNow')}</Title>
+            <View style={{ marginTop: SPACE.sm }}>
+              <Row label={t('pjNetNow')} value={money(c.projection.netNow)} valueColor={p.ink} />
+              <Row label={t('bankAcct')} value={money(c.projection.bank)} />
+              <Row
+                label={t('cardOut')}
+                value={money(c.projection.cardOutstanding)}
+                valueColor={p.negative}
+              />
+              <Row
+                label={t('monthSpend')}
+                value={money(c.projection.monthlyDiscretionary)}
+                valueColor={p.accentDeep}
+              />
+            </View>
+            <Caption style={{ marginTop: SPACE.xs }}>{t('pjNetNote')}</Caption>
+          </Card>
+        )}
+
         {/*
           Stated before any conclusion below it, because the reader needs to
           know how much weight the rest of this screen can carry.

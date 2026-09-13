@@ -29,4 +29,5 @@ export * from './adaptiveDaily';
 export * from './variance';
 export * from './forecast';
 export * from './readiness';
+export * from './projection';
 export * from './defaults';

@@ -2,6 +2,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GoalFeasibilityCard } from '../src/components/GoalFeasibility';
 import { Chips, RangeSlider, Sheet, TextField } from '../src/components/fields';
 import { Body, Button, Caption, Card, Meter, Row, Screen, Title } from '../src/components/ui';
 import {
@@ -185,6 +186,10 @@ export default function GoalPlanScreen() {
             />
           </View>
         </Card>
+
+        {/* Feasibility first: whether the goal is reachable at all decides
+            whether anything below it is worth reading. */}
+        {spend.projection != null && <GoalFeasibilityCard projection={spend.projection} />}
 
         {/* ---- living floor ---- */}
         <Card>

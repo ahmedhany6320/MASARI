@@ -798,4 +798,22 @@ export const en: Record<StringKey, string> = {
   obMissingB: 'The app sees no obligations against you, so it treats the whole salary as free and the goal takes a bigger share than it should. Add your rent, internet and monthly transfer.',
   obMissingBtn: 'Add my commitments',
   obMissingDone: 'Added — edit them under Plan → Commitments',
+
+  // ---- projection-based goal assessment ------------------------------------
+  pjT: 'Is the goal possible?',
+  pjImpossible: 'Not in this time',
+  pjImpossibleWhy: 'Even spending nothing at all on yourself, what accumulates falls short. The problem is not your spending — the time is short for the amount.',
+  pjUnsustainable: 'Possible, but not sustainable',
+  pjUnsustainableWhy: 'It arrives, but only by living below your floor for the whole term. That is endurance, not a plan.',
+  pjFeasible: 'Possible while living normally',
+  pjFeasibleWhy: 'You reach it inside your normal living range.',
+  pjMet: 'Already reached.',
+  pjCeiling: 'Ceiling, spending nothing',
+  pjAustere: 'Living at your minimum',
+  pjRealistic: 'Living normally',
+  pjShortfall: 'Short of your goal by',
+  pjNeedDaily: 'Daily spend that gets there',
+  pjNetNow: 'Your net position now',
+  pjNetNote: 'Bank and cash less everything owed on the card. This is the real figure.',
+  pjSource: 'Every figure here comes from the same projection Home and Analytics read.',
 };
