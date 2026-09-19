@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import * as Updates from 'expo-updates';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +14,27 @@ import { useLedger } from '../../src/store/useLedger';
 import { spendLadder } from '../../src/domain';
 import { FONT, SPACE } from '../../src/theme/tokens';
 import { version as APP_VERSION } from '../../package.json';
+
+/*
+ * When the JS currently running was published.
+ *
+ * The version number alone could not answer "did my update arrive?" — it is
+ * baked into the bundle, so the only way to read it was to already have the
+ * new bundle. A date the user can compare against when they pressed publish
+ * closes that loop. Null in development and on the build originally installed
+ * from the store, where there is no published update to date.
+ */
+const UPDATED_AT = (() => {
+  try {
+    const at = Updates.createdAt;
+    if (!at) return null;
+    return `${at.getDate()}/${at.getMonth() + 1}`;
+  } catch {
+    // expo-updates throws rather than returning null when updates are
+    // disabled, which is every development run. Not worth surfacing.
+    return null;
+  }
+})();
 
 /**
  * Home — the Safe Spend Limit.
@@ -142,6 +164,7 @@ export default function HomeScreen() {
         */}
         <Caption style={{ textAlign: rtl ? 'left' : 'right', opacity: 0.6 }}>
           v{APP_VERSION}
+          {UPDATED_AT ? ` · ${t('updatedOn')} ${UPDATED_AT}` : ''}
         </Caption>
 
         {/*

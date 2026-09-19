@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "pin-runtime": "node scripts/pin-runtime.mjs"
+    "pin-runtime": "node scripts/pin-runtime.mjs",
+    "send-update": "node scripts/send-update.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

@@ -367,6 +367,7 @@ export const en: Record<StringKey, string> = {
   closeDay: 'Statement day',
   dueDay: 'Payment due day',
   edit: 'Edit',
+  updatedOn: 'updated',
   obOblT: 'Monthly obligations',
   obOblNote:
     'Leave anything blank and it will not be added. You can add more later.',
