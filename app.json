@@ -64,13 +64,16 @@
     },
     "extra": {
       "router": {},
-      "eas": {}
+      "eas": {
+        "projectId": "30d5e217-9b48-41d3-996e-b0c48a23c6a0"
+      }
     },
     "runtimeVersion": "0.26.0",
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
-    }
+    },
+    "owner": "ahany6320"
   }
 }
