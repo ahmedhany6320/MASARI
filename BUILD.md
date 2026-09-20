@@ -30,7 +30,7 @@ npm install
 npm test
 ```
 
-المفروض يقول **632 passed**. لو قال أي رقم تاني أو fail، قوللي قبل ما تكمل.
+المفروض يقول **635 passed**. لو قال أي رقم تاني أو fail، قوللي قبل ما تكمل.
 
 ## خطوة 4 — سجّل دخول (لو مش مسجل)
 
@@ -201,7 +201,7 @@ npm run send-update "وصف التعديل"
 **First install (once):**
 ```bash
 npm install
-npm test                 # expect 632 passed
+npm test                 # expect 635 passed
 npx eas-cli login
 npx eas-cli build --platform android --profile preview
 ```
