@@ -36,6 +36,30 @@ function run(args, { capture = false } = {}) {
   });
 }
 
+/*
+ * The EAS project link lives in app.json as `extra.eas.projectId`, and it is
+ * per-account — this repository ships without one. So unzipping a fresh copy
+ * of the source over a working folder REPLACES app.json and takes the link
+ * with it, and every EAS command then fails with "project not configured".
+ *
+ * Checked here, before anything else, because the error EAS raises for this
+ * is about non-interactive mode and does not mention app.json at all.
+ */
+const cfgPath = new URL('../app.json', import.meta.url);
+const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+if (!cfg.expo?.extra?.eas?.projectId) {
+  console.error('\nThis folder is not linked to your EAS project yet.\n');
+  console.error('app.json has no extra.eas.projectId. Unzipping a fresh copy of');
+  console.error('the source over this folder replaces app.json and removes it.\n');
+  console.error('To link it back, run:\n');
+  console.error('    npx eas-cli init\n');
+  console.error('When it asks, choose the EXISTING project (masari).');
+  console.error('Do NOT create a new one — a new project starts with no builds,');
+  console.error('so nothing already on your phone could be updated from it.\n');
+  console.error('Then run this command again.\n');
+  process.exit(1);
+}
+
 console.log('Looking up which app versions exist...\n');
 
 let builds = [];
