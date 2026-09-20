@@ -1,111 +1,220 @@
-# مصاري — إزاي توصّل أي تعديل لتليفونك
+# مصاري — دليل التحميل والتحديث
 
-## أمر واحد بس
+النسخة: **0.27.0**
+
+---
+
+# الجزء الأول: تحميل التطبيق على التليفون
+
+ده بتعمله **مرة واحدة** بس (أو لما نغيّر حاجة في شكل التطبيق نفسه زي اللوجو).
+
+## خطوة 1 — جهّز الفولدر
+
+فك الملف المضغوط فوق `D:\Masari` (سيبه يستبدل الملفات القديمة).
+
+بعدين افتح **Command Prompt** جوه الفولدر:
+- افتح الفولدر في File Explorer
+- اكتب `cmd` في شريط العنوان فوق واضغط Enter
+
+## خطوة 2 — نزّل المكتبات
 
 ```bash
-npm run send-update "وصف التعديل"
+npm install
 ```
 
-خلاص. مفيش أرقام، مفيش نسخ، مفيش حاجة تبص عليها.
+ياخد دقيقتين تلاتة. طبيعي يطلع تحذيرات صفرا — متقلقش منها.
 
-الأمر بيجيب لوحده كل النسخ اللي اتبنت وكل النسخ اللي اتبعتلها تحديثات قبل
-كده، وبيبعت لكلهم.
-
-**ولو عايز تضيف نسخة معينة بنفسك**، اكتب رقمها في الآخر:
+## خطوة 3 — اتأكد إن كل حاجة سليمة
 
 ```bash
-npm run send-update "وصف التعديل" 0.25.0
+npm test
 ```
 
----
+المفروض يقول **632 passed**. لو قال أي رقم تاني أو fail، قوللي قبل ما تكمل.
 
-## بعد كده على التليفون
-
-اقفل مصاري **قفل كامل** (مش تصغير — اسحبه من قايمة التطبيقات المفتوحة)،
-وافتحه، واقفله، وافتحه تاني.
-
-**ليه مرتين؟** لأن التطبيق بينزّل التحديث في الخلفية أول مرة، وبيشغّله
-المرة اللي بعدها. ده عشان ميعطّلكش وانت فاتحه.
-
-## إزاي تعرف إنه وصل
-
-تحت خالص في الصفحة الرئيسية هتلاقي سطر صغير كده:
-
-```
-v0.26.0 · تحديث 19/9
-```
-
-التاريخ ده هو يوم ما نشرت التحديث. لو التاريخ بتاع النهاردة، يبقى وصل.
-
----
-
-## الأمر ده بيعمل إيه بالظبط؟
-
-قبل كده كان لازم تعرف رقم «التوافق» بتاع النسخة المسطبة على تليفونك
-وتكتبه بإيدك. ولو غلطت فيه ولو برقم واحد، التحديث كان بيتنشر، يقولك
-**نجح**، وميوصلش — من غير أي رسالة خطأ. ده اللي حصل معاك.
-
-الأمر الجديد بيسأل EAS بنفسه: «إيه النسخ اللي اتبنت فعلاً؟» وبيبعت نفس
-التحديث لكل واحدة فيهم. أنهي نسخة على تليفونك، التحديث موجّه ليها.
-
-بعتة لنسخة محدش شغال عليها متكلفش حاجة — سطر في جدول محدش بيسأل عنه.
-
----
-
-## قبل ما تنشر، لو حبيت تتأكد
+## خطوة 4 — سجّل دخول (لو مش مسجل)
 
 ```bash
-npm test          # لازم يقول 632 passed
-npm run typecheck # لازم يخرج من غير كلام
+npx eas-cli login
 ```
 
----
+لو قالك إنك مسجل خلاص، عدّي الخطوة دي.
 
-## إمتى تحتاج تبني APK جديد؟
-
-بس لو ضفنا حاجة بتلمس التليفون نفسه — كاميرا، موقع، مكتبة جديدة. ساعتها:
+## خطوة 5 — ابني الـ APK
 
 ```bash
 npx eas-cli build --platform android --profile preview
 ```
 
-التعديلات العادية (حسابات، شاشات، نصوص) **مش** محتاجة ده أبداً.
+**اللي هيحصل:**
+1. هيسألك أسئلة أول مرة بس — وافق على الافتراضي
+2. هيرفع الكود على سيرفرات Expo
+3. هيقف في الطابور شوية
+4. هيبني (من 10 لـ 25 دقيقة عادة)
+5. في الآخر هيديك **لينك** و **QR كود**
+
+سيب الشاشة مفتوحة لحد ما يخلص.
+
+## خطوة 6 — نزّل وركّب
+
+**من التليفون مباشرة:**
+- صوّر الـ QR كود بالكاميرا
+- هيفتح صفحة فيها زرار Download
+- نزّل الملف واضغط عليه
+
+**لو أندرويد منعك:**
+- هيقولك «التثبيت من مصادر غير معروفة»
+- اضغط **Settings** → فعّل السماح للمتصفح
+- ارجع واضغط Install تاني
+
+## خطوة 7 — البداية من الصفر
+
+انت طلبت التطبيق يبدأ فاضي. فيه طريقتين:
+
+**الطريقة المضمونة (الأنضف):**
+احذف مصاري القديم من التليفون **قبل** ما تركّب الجديد. كده مفيش أي بيانات قديمة تفضل.
+
+**لو ركّبته فوق القديم:**
+افتح التطبيق → **المزيد** → انزل تحت → **حذف كل البيانات** → أكّد.
+
+ده بيمسح:
+- كل الحركات والالتزامات والأهداف
+- الإشعارات المجدولة (عشان ميفضلش يبعتلك أرقام قديمة)
+- تسجيل الدخول للسحابة (عشان أي مزامنة مترجّعش البيانات تاني)
+
+وبعدها هيوديك لشاشة البداية على طول.
 
 ---
 
-## لو حاجة مشيت غلط
+# الجزء التاني: أي تعديل بعد كده
 
-**`npm run send-update` بيقول مش لاقي حاجة:**
+هنا الجزء المهم. **مش محتاج تبني APK تاني.**
+
+## أمر واحد
+
+```bash
+npm run send-update "وصف التعديل"
+```
+
+خلاص. ياخد دقيقة أو اتنين.
+
+## بعدين على التليفون
+
+1. اقفل مصاري **قفل كامل** — اسحبه من قايمة التطبيقات المفتوحة، مش بس تضغط Home
+2. افتحه (بينزّل التحديث في الخلفية، مش هتشوف حاجة)
+3. اقفله تاني
+4. افتحه (دلوقتي التحديث اشتغل)
+
+## إزاي تتأكد إنه وصل
+
+تحت خالص في الصفحة الرئيسية:
+
+```
+v0.27.0 · تحديث 20/9
+```
+
+**بص على التاريخ، مش الرقم.** لو تاريخ النهاردة — وصل.
+
+## ليه مرتين؟
+
+عشان التطبيق ميعطّلكش وهو فاتح. بينزّل في الخلفية المرة الأولى، وبيشغّل النسخة الجديدة المرة اللي بعدها.
+
+---
+
+# إمتى تحتاج تبني APK تاني؟
+
+**بس** في الحالات دي:
+
+| الحالة | محتاج build؟ |
+|---|---|
+| تغيير في الحسابات أو الأرقام | ❌ لأ — `send-update` |
+| شاشة جديدة أو تعديل شكل | ❌ لأ — `send-update` |
+| تغيير نصوص أو ترجمة | ❌ لأ — `send-update` |
+| **تغيير اللوجو أو أيقونة التطبيق** | ✅ أيوه |
+| **إضافة صلاحية** (كاميرا، موقع...) | ✅ أيوه |
+| **إضافة مكتبة بتلمس التليفون** | ✅ أيوه |
+
+99% من التعديلات من النوع الأول.
+
+**لو احتجت build جديد، ارفع الرقم الأول:**
+
+```bash
+npm run pin-runtime 0.28.0
+npx eas-cli build --platform android --profile preview
+```
+
+---
+
+# لو حاجة مشيت غلط
+
+### `npm run send-update` بيقول «not linked to your EAS project»
+
+```bash
+npx eas-cli init
+```
+اختار **masari** الموجود. ❌ متختارش «create a new project».
+
+### بيقول «not logged in»
+
 ```bash
 npx eas-cli login
 ```
-وجرّب تاني.
 
-**التحديث اتبعت بس لسه مش ظاهر:**
-- اتأكد إنك قافل التطبيق قفل كامل، مش بس صغّرته
-- افتح واقفل مرتين
-- اتأكد إن النت شغال على التليفون
+### التحديث اتبعت بس مش ظاهر على التليفون
+
+1. اتأكد إنك قافل التطبيق **قفل كامل**، مش مصغّره
+2. افتح واقفل مرتين
+3. اتأكد إن النت شغال
+4. شوف اتبعت لأنهي نسخة:
+   ```bash
+   npx eas-cli update:list --branch preview
+   ```
+   الرقم في `Runtime Version` لازم يساوي الرقم اللي في تطبيقك
+
+### عايز تبعت لنسخة معينة بنفسك
+
+```bash
+npm run send-update "وصف التعديل" 0.26.0
+```
+
+### الـ build فشل
+
+اقرا آخر سطر أحمر في الشاشة وابعتهولي. أغلب الأسباب: مساحة، أو نت قطع وسط الرفع.
 
 ---
 
-# English
+# ملخص سريع
 
-One command sends an update to the phone:
+```bash
+# أول مرة بس
+npm install
+npx eas-cli build --platform android --profile preview
 
+# كل مرة بعد كده
+npm run send-update "وصف التعديل"
+```
+
+---
+
+# English quick reference
+
+**First install (once):**
+```bash
+npm install
+npm test                 # expect 632 passed
+npx eas-cli login
+npx eas-cli build --platform android --profile preview
+```
+Scan the QR, download, install. To start empty, uninstall the old app first,
+or use More → Erase all data (which also cancels scheduled notifications and
+signs out of the cloud, so neither can resurrect the old state).
+
+**Every change after that:**
 ```bash
 npm run send-update "what changed"
 ```
+Then on the phone: fully close, open, close, open. The stamp at the bottom of
+Home shows the publish date — check the date, not the version.
 
-It asks EAS which runtime versions actually have finished builds and
-publishes the same update to each, so whichever build is installed is
-addressed. Publishing to a runtime nobody runs costs nothing.
-
-This replaces having to read the installed build's runtime version off the
-device and type it in exactly — where being wrong by one digit meant the
-update published "successfully" and reached nobody, silently.
-
-On the phone: fully close the app, open, close, open again. The first launch
-downloads the update in the background; the second applies it. The stamp at
-the bottom of Home shows the publish date so you can confirm it landed.
-
-A new APK is only needed when a native dependency or permission is added.
+A new APK is only needed for icon changes, new permissions, or new native
+dependencies. Bump first with `npm run pin-runtime <next>`.

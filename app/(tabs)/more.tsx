@@ -8,6 +8,8 @@ import { RestoreBackup } from '../../src/components/RestoreBackup';
 import { Tile, TileGrid } from '../../src/components/Tiles';
 import { Body, Button, Caption, Card, Row, Screen, Title } from '../../src/components/ui';
 import { salaryCycle } from '../../src/domain';
+import { signOut } from '../../src/lib/auth';
+import { cancelAll } from '../../src/lib/notifications';
 import {
   useCardPosition,
   useLocalization,
@@ -70,9 +72,35 @@ export default function MoreScreen() {
         text: t('resetGo'),
         style: 'destructive',
         onPress: () => {
-          reset();
-          Alert.alert(t('resetDoneT'), t('resetDoneB'));
-          router.replace('/onboarding');
+          void (async () => {
+            /*
+             * Two things used to survive "erase everything", and both made the
+             * fresh start a lie.
+             *
+             * Scheduled reminders live in the OS, not in the store, so a
+             * wiped app went on announcing yesterday's daily limit for days.
+             * And the cloud session stayed signed in, so the very next pull
+             * could put the erased ledger straight back.
+             *
+             * Neither is allowed to fail the reset: the local wipe is the
+             * part the user asked for, so it happens either way.
+             */
+            try {
+              await cancelAll();
+            } catch {
+              // The OS refused to list or cancel. Nothing here is worth
+              // blocking an erase over.
+            }
+            try {
+              await signOut();
+            } catch {
+              // Offline, most likely. The local session is dropped anyway.
+            }
+
+            reset();
+            Alert.alert(t('resetDoneT'), t('resetDoneB'));
+            router.replace('/onboarding');
+          })();
         },
       },
     ]);
